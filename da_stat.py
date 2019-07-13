@@ -2,6 +2,8 @@
 # Contacts: derzhiarbuz@gmail.com
 
 import numpy as np
+import math
+import time
 from random import randrange
 
 
@@ -16,18 +18,32 @@ def tables_mean_square_error(table1, table2):
     return mean_square
 
 
+def table_probability(table, cols=None, rows=None, n=None):
+    if cols is None:
+        cols = np.sum(table, axis=0)
+    if rows is None:
+        rows = np.sum(table, axis=1)
+    if n is None:
+        n = int(np.sum(cols))
+    p = 1.
+    for col in cols:
+        p *= math.factorial(col)
+    p /= math.factorial(n)
+    for row in rows:
+        p *= math.factorial(row)
+    for i in range(cols.size):
+        for j in range(rows.size):
+            p /= math.factorial(table[i, j])
+    return p
+
+
 def exact_fisher_mc(contingency_table):
     avg = np.zeros(contingency_table.shape)
     cols = np.sum(contingency_table, axis=0)
     rows = np.sum(contingency_table, axis=1)
     n = int(np.sum(cols))
-    #generating the most likely table for given margins (cols and rows)
-    for i in range(avg.shape[0]):
-        for j in range(avg.shape[1]):
-            avg[i, j] = cols[j]*rows[i]/n
-    #calculate square error for given contingency table
-    err_treshold = tables_mean_square_error(contingency_table, avg)
-    #print(err_treshold)
+    #calculate probability for given contingency table
+    p_treshold = table_probability(contingency_table, cols, rows, n)
     #make arrays for choosing cases during monte carlo procedure
     col_factor_cases = np.zeros(n, dtype=int)
     row_factor_cases = np.zeros(n, dtype=int)
@@ -53,15 +69,16 @@ def exact_fisher_mc(contingency_table):
             rand_table[row_factor_cases[k], col_factor_cases[p]] += 1
             col_factor_cases[p], col_factor_cases[n-i-1] = col_factor_cases[n-i-1], col_factor_cases[p]
             row_factor_cases[k], row_factor_cases[n - i - 1] = row_factor_cases[n - i - 1], row_factor_cases[k]
-        err = tables_mean_square_error(rand_table, avg)
-        if err >= err_treshold:
+        p = table_probability(rand_table, cols, rows, n)
+        if p <= p_treshold:
             n_rejected += 1
         l += 1
     return n_rejected/l
 
 
 if __name__ == '__main__':
-    arr = np.array([[10, 4, 1], [10, 4, 1], [2, 0, 4]])
+    arr = np.array([[3, 0, 0], [0, 3, 0], [0, 0, 3]])
+    print('true p-value: ' + str(table_probability(arr)*6))
     print('p-value estimation: ' + str(exact_fisher_mc(arr)))
     print('p-value estimation: ' + str(exact_fisher_mc(arr)))
     print('p-value estimation: ' + str(exact_fisher_mc(arr)))
