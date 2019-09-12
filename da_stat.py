@@ -7,15 +7,15 @@ import time
 from random import randrange
 
 
-def tables_mean_square_error(table1, table2):
-    if table1.shape != table2.shape:
-        return None
-    mean_square = 0.
-    for i in range(table1.shape[0]):
-        for j in range(table1.shape[1]):
-            mean_square += (table2[i, j] - table1[i, j]) ** 2
-    mean_square /= table1.shape[0] * table1.shape[1]
-    return mean_square
+# def tables_mean_square_error(table1, table2):
+#     if table1.shape != table2.shape:
+#         return None
+#     mean_square = 0.
+#     for i in range(table1.shape[0]):
+#         for j in range(table1.shape[1]):
+#             mean_square += (table2[i, j] - table1[i, j]) ** 2
+#     mean_square /= table1.shape[0] * table1.shape[1]
+#     return mean_square
 
 
 def table_probability(table, cols=None, rows=None, n=None):
@@ -58,9 +58,9 @@ def exact_fisher_mc(contingency_table):
             row_factor_cases[k] = i
             k += 1
     n_rejected = 0
-    max_iter = 10000
+    max_iter = 100000
     l = 0
-    while n_rejected < 50 and l < max_iter:
+    while n_rejected < 200 and l < max_iter:
         #the iteretion of monte-carlo procedure. Independently choose the value for first and second factors for each case
         rand_table = np.zeros(avg.shape, dtype=int)
         for i in range(n):
@@ -77,7 +77,9 @@ def exact_fisher_mc(contingency_table):
 
 
 if __name__ == '__main__':
-    arr = np.array([[3, 0, 0], [0, 3, 0], [0, 0, 3]])
+    arr = np.array([[3, 0, 0],
+                    [0, 3, 0],
+                    [0, 0, 3]])
     print('true p-value: ' + str(table_probability(arr)*6))
     print('p-value estimation: ' + str(exact_fisher_mc(arr)))
     print('p-value estimation: ' + str(exact_fisher_mc(arr)))

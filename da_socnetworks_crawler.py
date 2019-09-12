@@ -187,7 +187,7 @@ def get_members_for_vk_group(group_id: str, user_ids=None, meta=False):
         return error
 
 
-def check_post_text_md5(post:dict, content_md5:str):
+def check_post_text_md5(post: dict, content_md5: str):
     text = post.get('text')
     if text is not None:
         text = re.sub(r"\n"," ", text)
@@ -366,6 +366,37 @@ def get_posts(owner_id, count, offset=0):
             offset = total
             posts_data = []
             error = posts
+
+    if error is None:
+        return posts_data
+    else:
+        return error
+
+
+def get_posts_by_id(owner_id, ids: set):
+    print('Get posts by ids from wall: ' + str(owner_id) + ' count: ' + str(len(ids)))
+    total = 0
+    checked = 0
+    error = None
+    ids_string = ''
+    posts_data = []
+
+    for post_id in ids:
+        total += 1
+        checked += 1
+        ids_string += str(owner_id) + '_' + str(post_id)
+        if total >= 100 or checked == len(ids):
+            posts = vk.api('wall.getById', {'posts': ids_string}, ispost=True)
+            # print(posts)
+            if vk.check(posts):
+                posts_data += posts['response']
+            else:
+                posts_data = []
+                error = posts
+            total = 0
+            ids_string = ''
+        else:
+            ids_string += ','
 
     if error is None:
         return posts_data

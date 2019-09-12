@@ -24,13 +24,16 @@ class ConnectionsNetworkManager(NetworkManager):
         self.nodes_meta = data_dict['nodes_meta']
         self.crawled_nodes = data_dict['scanned_nodes']
 
-    def schedule_crawl_ego_network(self, source_id, deep=1):
+    def schedule_crawl_ego_network(self, source_id, deep=1, force=False):
         crawler = {'type': 'ego',
                    'deep': deep,
                    'left': [{source_id}]}
         for i in range(0, deep):
             crawler['left'].append(set())
         self.crawl_plan.append(crawler)
+        if force is True:
+            if source_id in self.crawled_nodes:
+                self.crawled_nodes.remove(source_id)
 
     def schedule_load_nodes_meta(self):
         nodes_to_load = self.crawled_nodes - self.nodes_meta.keys()
@@ -52,6 +55,8 @@ class ConnectionsNetworkManager(NetworkManager):
             result = 'done'
             crawler = self.crawl_plan[0]
             if crawler['type'] == 'ego':
+                if len(crawler['left']) > 1:
+                    print('left' + str(len(crawler['left'][1])))
                 result = self.crawl_ego(crawler)
             elif crawler['type'] == 'meta':
                 result = self.crawl_meta(crawler)
@@ -69,8 +74,9 @@ class ConnectionsNetworkManager(NetworkManager):
         empty = True
         deep = crawler['deep']
         left = crawler['left']
+        i = 0
         for layer in left:
-            i = 0
+            #i = 0
             while len(layer) and empty:
                 node_id = layer.pop()
                 print(node_id)

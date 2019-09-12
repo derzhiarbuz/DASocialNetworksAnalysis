@@ -24,6 +24,9 @@ from da_information_conductivity import InformationConductivity
 # res = snc.get_vk_groups(ids)
 # print(res)
 
+# res = snc.get_posts_by_id(-65970801, {845213, 814932})
+# print(res)
+
 # mngr.load_from_file()
 # print(mngr.network.nodes)
 
@@ -42,23 +45,27 @@ from da_information_conductivity import InformationConductivity
 # -56176996 - WorldVita
 # -30800293 - RussianBirch
 # -145583685 - Dobroserd
+# -65970801 - Zhest Tomska
 
-casman = CascadesManager(name='Dobroserd', base_dir='D:/BigData/Charity/Cascades/')
+casman = CascadesManager(name='Zhest', base_dir='D:/BigData/Charity/Cascades/')
 # casman.save_to_file()
 casman.load_from_file()
-#casman.schedule_crawl_posts_for_group(-145583685, 500)
-casman.continue_crawling()
-casman.save_to_file()
+# casman.schedule_crawl_posts_for_group(-65970801, 1, post_ids={845213})
+# casman.schedule_crawl_posts_for_group(-145583685, 500)
+# casman.continue_crawling()
+# casman.save_to_file()
 # casman.load_from_file()
-casman.schedule_crawl_underlying_network()
+# casman.schedule_crawl_underlying_network()
+casman.underlying_net.schedule_crawl_ego_network(-65970801, deep=1, force=True)
+# print(casman.crawl_plan)
 casman.continue_crawling()
 casman.save_to_file()
-casman.update_cascades(uselikes=False, usehiddens=False)
-casman.save_to_file()
-
-cond_net = InformationConductivity()
-cond_net.make_cascades_summary(casman.cascades)
-print(cond_net.cascades_network.links)
-print(cond_net.cascades_network.nodes)
-print(cond_net.cascades_network.nodes_attributes)
-cond_net.cascades_network.export_gexf('D:/BigData/Charity/Cascades/Dobroserd500Summary.gexf', drop_singletones=True)
+# casman.update_cascades(uselikes=False, usehiddens=False)
+# casman.save_to_file()
+#
+# cond_net = InformationConductivity()
+# cond_net.make_cascades_summary(casman.cascades)
+# print(cond_net.cascades_network.links)
+# print(cond_net.cascades_network.nodes)
+# print(cond_net.cascades_network.nodes_attributes)
+# cond_net.cascades_network.export_gexf('D:/BigData/Charity/Cascades/Dobroserd500Summary.gexf', drop_singletones=True)

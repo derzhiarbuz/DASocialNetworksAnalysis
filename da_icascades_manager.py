@@ -16,27 +16,33 @@ class CascadesManager(object):
         self._name = name
         self.base_dir = base_dir
         self.crawl_plan = []
-        self._crawl_count = 0;
+        self._crawl_count = 0
 
     def crawl_next(self):
         if len(self.crawl_plan):
             src = self.crawl_plan.pop(0)
-            result = self.get_posts_for_group(src['source_id'], src['n'])
+            if 'post_ids' in src.keys():
+                result = self.get_posts_for_group(src['source_id'], src['n'], post_ids=src['post_ids'])
+            else:
+                result = self.get_posts_for_group(src['source_id'], src['n'])
             if result == 'done':
                 return 1
             else:
                 self.crawl_plan.insert(0, src)
                 return -1
-        # for cascade in self.cascades:
-        #     res = cascade.crawl_next()
-        #     if res != 0:
-        #         return res
+        for cascade in self.cascades:
+            res = cascade.crawl_next()
+            if res != 0:
+                return res
         if self.underlying_net:
             return self.underlying_net.crawl_next()
         return 0
 
-    def get_posts_for_group(self, group_id, n):
-        posts = crlr.get_posts(-abs(group_id), n)
+    def get_posts_for_group(self, group_id, n, post_ids=None):
+        if post_ids is None:
+            posts = crlr.get_posts(-abs(group_id), n)
+        else:
+            posts = crlr.get_posts_by_id(-abs(group_id), post_ids)
         if vk.is_error(posts):
             print('Error: ' + str(posts['error']['error_code']) + ' ' + posts['error']['error_msg'])
             return 'error'
@@ -46,15 +52,18 @@ class CascadesManager(object):
             self.cascades.add(cascade)
         return 'done'
 
-    def schedule_crawl_posts_for_group(self, source_id, n):
-        self.crawl_plan.append({'source_id': source_id, 'n': n})
+    def schedule_crawl_posts_for_group(self, source_id, n=0, post_ids=None):
+        if post_ids is None:
+            self.crawl_plan.append({'source_id': source_id, 'n': n})
+        else:
+            self.crawl_plan.append({'source_id': source_id, 'n': n, 'post_ids': post_ids})
 
     def schedule_crawl_underlying_network(self):
         nodes_to_crowl = set()
         for cascade in self.cascades:
             nodes_to_crowl.update(cascade.posters.keys())
             nodes_to_crowl.update(cascade.hiddens)
-            nodes_to_crowl.update(cascade.hiddens)
+#            nodes_to_crowl.update(cascade.hiddens)
             nodes_to_crowl.update(cascade.likers)
         # print(len(nodes_to_crowl))
         for node_id in nodes_to_crowl:
