@@ -6,6 +6,7 @@ from da_connections_network_manager import ConnectionsNetworkManager
 import da_socnetworks_crawler as crlr
 import da_vk_api as vk
 from da_sna_data_manager import DataManager
+import datetime
 
 
 class CascadesManager(object):
@@ -85,10 +86,10 @@ class CascadesManager(object):
                       + ' Nodes: ' + str(len(self.underlying_net.network.nodes))
                       + ' Nodes to check: ' + str(len(self.underlying_net.crawl_plan)))
 
-    def load_from_file(self):
+    def load_from_file(self, crowled_only=False):
         self.cascades = DataManager.load(self.base_dir + self._name + '_cascades.pkl')
         try:
-            self.underlying_net.load_from_file()
+            self.underlying_net.load_from_file(crowled_only=crowled_only)
         except IOError:
             self.underlying_net = ConnectionsNetworkManager(name=(self._name+'u'), base_dir=self.base_dir)
 
@@ -100,3 +101,93 @@ class CascadesManager(object):
         existing_links = self.underlying_net.network.nodes
         for cascade in self.cascades:
             cascade.remake_network(existing_links, uselikes, usehiddens)
+
+    def write_gexf(self, fname, trim_unchecked_nodes = True): #this function makes gexf for cascade
+        file = open(fname, "w", encoding='utf-8')
+        file.write('''<?xml version="1.0" encoding="UTF-8"?>
+                    <gexf xmlns="http://www.gexf.net/1.2draft" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd" version="1.2">
+                    <meta lastmodifieddate="''' + datetime.date.today().strftime("%Y-%m-%d") + '''">
+                    <creator>''' + "Derzhiarbuz" + '''</creator>
+                    <description>''' + self._name + " group cascade" + '''</description>
+                    </meta>''')
+        file.write('\n<graph>')
+
+        file.write('\n<attributes class="node">')
+        file.write('<attribute id="1" title="actual_degree" type="int"></attribute>')
+        if len(self.cascades) == 1:
+            file.write('<attribute id="2" title="liker" type="boolean"></attribute>')
+            file.write('<attribute id="3" title="hidden" type="boolean"></attribute>')
+        file.write('</attributes>')
+
+        file.write('\n<attributes class="edge">')
+        file.write('<attribute id="33" title="type" type="int"></attribute>')
+        file.write('</attributes>')
+
+        print(len(self.underlying_net.network.nodes))
+        nodes = self.underlying_net.network.nodes
+        keys = nodes.keys()
+        single_cascade = None
+        for cascade in self.cascades:
+            cascade.remake_network(possible_links=nodes, uselikes=False, usehiddens=False)
+            if len(self.cascades) == 1:
+                single_cascade = cascade
+
+        if len(nodes):
+            file.write('''\n\t\t<nodes>''')
+            for node_id, node_neighbors in nodes.items():
+                file.write('\n<node')
+                file.write(' id="' + str(node_id) + '"')
+                file.write('>')
+                file.write('''\n<attvalues>''')
+                file.write('''<attvalue for="1" value="''' + str(len(node_neighbors)) + '''"/>''')
+                if single_cascade:
+                    if node_id in single_cascade.likers or node_id in single_cascade.hiddens:
+                        file.write('''<attvalue for="2" value="true"/>''')
+                    else:
+                        file.write('''<attvalue for="2" value="false"/>''')
+                    if node_id in single_cascade.hiddens:
+                        file.write('''<attvalue for="3" value="true"/>''')
+                    else:
+                        file.write('''<attvalue for="3" value="false"/>''')
+                file.write('''</attvalues>''')
+                file.write('''\n</node>''')
+            file.write('''\n</nodes>''')
+
+        edge_id = 0
+        file.write('''\n\t\t<edges>''')
+        if len(nodes):
+            for node_id, node_neighbors in nodes.items():
+                for neighbor_id in node_neighbors:
+                    if node_id < neighbor_id and neighbor_id in keys:
+                        file.write('\n<edge')
+                        file.write(' id="' + str(edge_id) + '"')
+                        edge_id += 1
+                        file.write(' source="' + str(node_id) + '"')
+                        file.write(' target="' + str(neighbor_id) + '"')
+                        file.write(' type="undirected"')
+                        file.write('>')
+                        file.write('''\n<attvalues>''')
+                        file.write('''<attvalue for="33" value="0"/>''')
+                        file.write('''</attvalues>''')
+                        file.write('''\n</edge>''')
+        cascade_n = 1
+        for cascade in self.cascades:
+            print(len(cascade.network.nodes))
+            for link in cascade.network.links.keys():
+                file.write('\n<edge')
+                file.write(' id="' + str(edge_id) + '"')
+                edge_id += 1
+                file.write(' source="' + str(link[0]) + '"')
+                file.write(' target="' + str(link[1]) + '"')
+                file.write(' type="directed"')
+                file.write('>')
+                file.write('''\n<attvalues>''')
+                file.write('''<attvalue for="33" value="''' + str(cascade_n) + '''"/>''')
+                file.write('''</attvalues>''')
+                file.write('''\n</edge>''')
+            cascade_n += 1
+        file.write('''\n</edges>''')
+
+        file.write("\n</graph>")
+        file.write("\n</gexf>")
+        file.close()

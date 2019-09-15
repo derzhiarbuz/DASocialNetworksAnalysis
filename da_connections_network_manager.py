@@ -5,6 +5,7 @@ from da_network import Network, NetworkOptimisation
 from da_network_manager import NetworkSource, NetworkManager
 import da_vk_api as vk
 import da_socnetworks_crawler as crlr
+from da_sna_data_manager import DataManager
 
 
 class ConnectionsNetworkManager(NetworkManager):
@@ -23,6 +24,19 @@ class ConnectionsNetworkManager(NetworkManager):
         super().set_data_dict(data_dict)
         self.nodes_meta = data_dict['nodes_meta']
         self.crawled_nodes = data_dict['scanned_nodes']
+
+    def load_from_file(self, crowled_only=False):
+        if crowled_only:
+            # this dirty hack is just to be able to load large network (>3700000nds) without unscanned nodes
+            other_data = DataManager.load(self.base_dir + self.name + '_data.pkl')
+            self.set_data_dict(other_data)
+            if self.network.optimisation == NetworkOptimisation.id_only:
+                network_dos = DataManager.load_dict_of_set_of_ints_binary(self.base_dir + self.name + '_network.dos',
+                                                                          valid_ids=self.crawled_nodes)
+                self.network.nodes = network_dos
+                self.network.timestamp = other_data['dos_timestamp']
+            return
+        super().load_from_file()
 
     def schedule_crawl_ego_network(self, source_id, deep=1, force=False):
         crawler = {'type': 'ego',

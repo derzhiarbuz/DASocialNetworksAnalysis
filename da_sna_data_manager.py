@@ -56,7 +56,7 @@ class DataManager(object):
             return False
 
     @staticmethod
-    def load_dict_of_set_of_ints_binary(filename):
+    def load_dict_of_set_of_ints_binary(filename, valid_ids=None):
         file = open(filename, 'rb')
         obj = {}
         byte_arr = file.read(4)
@@ -68,10 +68,18 @@ class DataManager(object):
                 byte_arr = file.read(4)
                 key = int.from_bytes(byte_arr, 'little', signed=True)
                 obj_key = set()
-                obj[key] = obj_key
-                for i in range(n):
+                if valid_ids is not None:
+                    if key in valid_ids:
+                        obj[key] = obj_key
+                else:
+                    obj[key] = obj_key
+                if i%1000 == 0:
+                    print(str(i) + "   " + str(n) + "  " + str(len(obj)))
+                for j in range(n):
                     byte_arr = file.read(4)
                     obj_key.add(int.from_bytes(byte_arr, 'little', signed=True))
+                if valid_ids is not None and len(obj) >= len(valid_ids):
+                    break
         file.close()
         return obj
 
