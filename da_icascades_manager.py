@@ -191,3 +191,65 @@ class CascadesManager(object):
         file.write("\n</graph>")
         file.write("\n</gexf>")
         file.close()
+
+    def write_stat_csv(self, fname):
+        file = open(fname, "w", encoding='utf-8')
+
+        print(len(self.underlying_net.network.nodes))
+        nodes = self.underlying_net.network.nodes
+        keys = nodes.keys()
+        for cascade in self.cascades:
+            cascade.remake_network(possible_links=nodes, uselikes=False, usehiddens=False)
+
+        file.write('UserID,Degree,')
+        i = 1
+        for cascade in self.cascades:
+            file.write('Out' + str(i) + ',')
+            file.write('In' + str(i) + ',')
+            file.write('Likes' + str(i) + ',')
+            file.write('Views' + str(i) + ',')
+            file.write('Reposts' + str(i) + ',')
+            file.write('Timestamp' + str(i) + ',')
+            i += 1
+        file.write('\n')
+        for key in keys:
+            exist = False
+            for cascade in self.cascades:
+                node_cascade = cascade.network.nodes.get(key)
+                if node_cascade is not None:
+                    exist = True
+
+            if exist:
+                file.write(str(key)+',')
+                node_underlying = self.underlying_net.network.nodes[key]
+                file.write(str(len(node_underlying)) + ',')
+                for cascade in self.cascades:
+                    node_cascade = cascade.network.nodes.get(key)
+                    if node_cascade is not None:
+                        file.write(str(len(node_cascade['out'])) + ',')
+                        file.write(str(len(node_cascade['in'])) + ',')
+                        post_info = cascade.posters[key]
+                        file.write(str(len(post_info['likes'])) + ',')
+                        file.write(str(post_info['views']) + ',')
+                        file.write(str(post_info['reposts']) + ',')
+                        file.write(str(post_info['date']) + ',')
+
+                file.write('\n')
+
+        file.close()
+
+    def write_diffusion_speed_csv(self, fname):
+        file = open(fname, "w", encoding='utf-8')
+        for cascade in self.cascades:
+            dates = []
+            for post_info in cascade.posters.values():
+                dates.append(post_info['date'])
+            dates.sort()
+            mindate = dates[0]
+            for i in range(len(dates)):
+                file.write(str(dates[i])+',')
+            file.write('\n')
+            for i in range(len(dates)):
+                file.write(str(i+1) + ',')
+            file.write('\n')
+        file.close()

@@ -43,6 +43,30 @@ class Network(object):
         else:
             return None
 
+    def get_in_neighbors_for_node(self, node_id, include_mutual=True):
+        if node_id in self.nodes_ids:
+            if self.optimisation == NetworkOptimisation.id_only:
+                return self.nodes[node_id]
+            else:
+                if include_mutual:
+                    return self.nodes[node_id]['in'] + self.nodes[node_id]['inout']
+                else:
+                    return self.nodes[node_id]['in']
+        else:
+            return None
+
+    def get_out_neighbors_for_node(self, node_id, include_mutual=True):
+        if node_id in self.nodes_ids:
+            if self.optimisation == NetworkOptimisation.id_only:
+                return self.nodes[node_id]
+            else:
+                if include_mutual:
+                    return self.nodes[node_id]['out'] + self.nodes[node_id]['inout']
+                else:
+                    return self.nodes[node_id]['out']
+        else:
+            return None
+
     def add_node(self, node_id):
         if node_id not in self.nodes_ids:
             if self.optimisation == NetworkOptimisation.id_only:
