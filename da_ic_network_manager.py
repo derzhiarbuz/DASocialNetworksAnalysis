@@ -66,6 +66,7 @@ class ICNetworkManager(NetworkManager):
             return 'empty'
         elif crawler['stage'] == 1:
             source_id = crawler['source_id']
+            post_id = crawler['post_id']
             likes_to_process = crawler['likes_to_process']
             likes_processed = crawler['likes_processed']
             if len(likes_to_process) == 0:
@@ -77,7 +78,8 @@ class ICNetworkManager(NetworkManager):
             new_post_info = crlr.find_post_on_wall(user_id, content_md5, search_string, source_id,
                                                    source_date,
                                                    use_cache=True,
-                                                   cache_date_utc=(self.timestamp.timestamp()-25200))
+                                                   cache_date_utc=(self.timestamp.timestamp()-25200),
+                                                   original_id=post_id)
             if vk.is_error(new_post_info):
                 likes_to_process.add(user_id)
                 print('Error: ' + str(new_post_info['error']['error_code']) + ' ' + new_post_info['error']['error_msg'])
@@ -91,6 +93,12 @@ class ICNetworkManager(NetworkManager):
                 likes_processed.add(user_id)
                 if len(new_post_info['likes']):
                     likes_to_process |= new_post_info['likes'] - likes_processed
+                if len(new_post_info['copy_history']):
+                    for copy_case in new_post_info['copy_history']:
+                        if copy_case['owner_id'] not in likes_processed:
+                            likes_to_process.add(copy_case['owner_id'])
+                        if copy_case['from_id'] not in likes_processed:
+                            likes_to_process.add(copy_case['from_id'])
             elif new_post_info['type'] == 'hidden':
                 self.hiddens.add(user_id)
             elif new_post_info['type'] == 'liker':

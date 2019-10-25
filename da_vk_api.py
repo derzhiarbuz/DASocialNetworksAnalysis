@@ -15,9 +15,6 @@ TOKEN_REQUEST1 = 'https://oauth.vk.com/authorize?client_id=6759333&display=page&
 APP_ID2 = '7041015' #adventist8day@gmail.com Qwerty12345
 TOKEN_REQUEST2 = 'https://oauth.vk.com/authorize?client_id=7041015&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.92'
 
-APP_ID3 = '7041050' #adventist9day@gmail.com Qwerty12345
-TOKEN_REQUEST3 = 'https://oauth.vk.com/authorize?client_id=7041050&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.92'
-
 APP_ID4 = '7041056' #adventist10day@gmail.com Qwerty12345
 TOKEN_REQUEST4 = 'https://oauth.vk.com/authorize?client_id=7041056&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.92'
 
@@ -27,11 +24,10 @@ TOKEN_REQUEST5 = 'https://oauth.vk.com/authorize?client_id=7041064&display=page&
 
 ACCESS_TOKEN = '57a837765997b5bfc8b7ef168f84d813090c96b59b84debb5af9b952e059d9bc79161a300de5ab7287328'
 
-ACCESS_TOKENS = ['6505df628defb8b4951ac67a0440aac5d63239e103632dbc5b0bad2705fa16425c9f2ccc0f7cbd6ed83a9',
-                 '23f8c58730c797daaa3c8b4fd3e02ee97cd58c4838d5e036549c801bf29fd2389ea57274688a5752e7566',
-                 '6a1998326ab1326863e142e3955992b1ad0b835b3a08eb1b325ba5427354231fdc259f60bbdc58191d6a4',
-                 '7b97ae6f96a863a36d5c7f8b089adf3a1e4b732638b49b7da9a66f27bb1fa7331637642e2ff76e525ea80',
-                 '70caa38d0c68494dcfd2a9fb306651916541c7a66b98a4ac6cd5c696a4494de64d3c851d6b4c4432dd181'
+ACCESS_TOKENS = ['b43ab3cc6fffdbb380f75ecf67098cc7e56ff5648c7d66fc5b79178d99c36513f82bc68e98687e2a1883f',
+                 'c4530d7da5bfd2f02385b2a52bdbb349b784f9816c630781c8005567aafad98d64ee65e1051e17454aa9c',
+                 'c8acb593349cb41ffcdf201ece0e1355890b9ba2b6218c2116247751e4b421baa55a6b0094db7a2bfde8e',
+                 '26095e58ba7019948a623667242b4b2bc1b91351d168c89d11027edc73b23303425c039c8d24b664014ab',
                  ]
 TOKEN_I = 0
 

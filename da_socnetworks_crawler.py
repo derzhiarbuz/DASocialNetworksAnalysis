@@ -198,22 +198,29 @@ def check_post_text_md5(post: dict, content_md5: str):
 
 def get_postinfo_for_post(post, owner_id, post_md5=None):
     postinfo = {'type': 'poster'}
+    postinfo['copy_history'] = []
     copy_history = post.get('copy_history')
     if copy_history is not None:
         print(copy_history)
-        if post_md5 is not None:
-            for copy_post in copy_history:
-                if check_post_text_md5(copy_post, post_md5):
-                    postinfo['copy_from_id'] = copy_post['from_id']
-                    postinfo['copy_date'] = copy_post['date']
-                    break
-        else:
-            postinfo['copy_from_id'] = copy_history[0]['from_id']
-            postinfo['copy_date'] = copy_history[0]['date']
+    # if post_md5 is not None:
+        for copy_post in copy_history:
+            postinfo['copy_history'].append({'owner_id': copy_post['owner_id'],
+                                             'from_id': copy_post['from_id'],
+                                             'date': copy_post['date']})
+            # if check_post_text_md5(copy_post, post_md5):
+            #     postinfo['copy_from_id'] = copy_post['from_id']
+            #     postinfo['copy_date'] = copy_post['date']
+            #     break
+    # else:
+        postinfo['copy_from_id'] = copy_history[0]['from_id']
+        postinfo['copy_date'] = copy_history[0]['date']
 
     postinfo['id'] = post['id']
     postinfo['from_id'] = post['from_id']
     postinfo['date'] = post['date']
+
+    #test stub
+    # postinfo['original'] = post
 
     if post.get('reposts'):
         postinfo['reposts'] = post['reposts']['count']
@@ -223,6 +230,10 @@ def get_postinfo_for_post(post, owner_id, post_md5=None):
         postinfo['views'] = post['views']['count']
     else:
         postinfo['views'] = 0
+    if post.get('comments'):
+        postinfo['comments'] = post['comments']['count']
+    else:
+        postinfo['comments'] = 0
     postinfo['likes'] = get_likes_for_post(str(postinfo['id']), owner_id)
 
     return postinfo
@@ -272,13 +283,17 @@ def get_likes_for_post(post_id, owner_id):
         return error
 
 
-def find_post_on_wall(owner_id, content_md5: str, search_string: str, original_from_id=0, original_date=None,
-                      wallsearch=False, use_cache=False, cache_date_utc=None):
+def find_post_on_wall(owner_id, content_md5: str, search_string: str, original_from_id=0,
+                      original_date=None, wallsearch=False, use_cache=False, cache_date_utc=None, original_id = 0):
     print('Finding post on wall: ' + str(owner_id) + ' wallsearch: ' + str(wallsearch))
     if wallsearch:
         posts = vk.api('wall.search',
                             {'type': 'post', 'owner_id': str(owner_id), 'query': search_string, 'count': 100,
                              'owners_only': 1})
+        if posts.get('response'):
+            print(posts['response'])
+        elif posts.get('error'):
+            print(posts['error'])
     else:
         posts = vk.api('wall.get', {'type': 'post', 'owner_id': str(owner_id), 'count': 100,
                                     'owners_only': 1}, use_cache=use_cache, cache_date_utc=cache_date_utc)
@@ -289,9 +304,18 @@ def find_post_on_wall(owner_id, content_md5: str, search_string: str, original_f
             if check_post_text_md5(post, content_md5):
                 postfound = post
                 break
+            if post['from_id'] == original_from_id and post['id'] == original_id:
+                postfound = post
+                break
             copy_history = post.get('copy_history')
             if copy_history is not None:
                 for copy_post in copy_history:
+                    copy_from_id = copy_post['from_id']
+                    copy_date = copy_post['date']
+                    post_id = copy_post['id']
+                    if copy_from_id == original_from_id and post_id == original_id and copy_date == original_date:
+                        postfound = post
+                        break
                     if check_post_text_md5(copy_post, content_md5):
                         postfound = post
                         copy_from_id = copy_post['from_id']
@@ -332,7 +356,7 @@ def find_post_on_wall(owner_id, content_md5: str, search_string: str, original_f
                     if last_post_date > original_date:
                         print('we need to go deeper...')
                         return find_post_on_wall(owner_id, content_md5, search_string, original_from_id, original_date,
-                                                 True)
+                                                 True, original_id=original_id)
 
         return {'type': 'liker'}
     else:
