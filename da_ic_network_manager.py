@@ -6,6 +6,7 @@ from da_network_manager import NetworkManager
 import da_vk_api as vk
 import da_socnetworks_crawler as crlr
 import datetime
+import math
 
 
 class ICNetworkManager(NetworkManager):
@@ -119,9 +120,15 @@ class ICNetworkManager(NetworkManager):
 
         self.crawl_plan.append(crawler)
 
-    def remake_network(self, possible_links: dict, uselikes=True, usehiddens=True):
+    def remake_network(self, possible_links: dict, uselikes=True, usehiddens=True, dynamic=True,
+                       logdyn=False, start_from_zero=False):
         # print('This method updates network from post_meta, hiddens, likers etc.')
         self.network = Network()
+        if dynamic:
+            self.network.nodes_attributes.append({'id': 'start', 'title': 'start', 'type': 'float'})
+            self.network.nodes_attributes.append({'id': 'n', 'title': 'Underlying_degree', 'type': 'integer'})
+            self.network.nodes_attributes.append({'id': 'g', 'title': 'Is_group', 'type': 'boolean'})
+            self.network.links_attributes.append({'id': 'start', 'title': 'start', 'type': 'float'})
         if usehiddens:
             for node_id in self.hiddens:
                 self.network.add_node(node_id)
@@ -129,16 +136,44 @@ class ICNetworkManager(NetworkManager):
             for node_id in self.likers:
                 self.network.add_node(node_id)
         nodes = self.posters.keys()
+        min_date = float("inf")
+        if start_from_zero:
+            for node_id in nodes:
+                date = self.posters[node_id]['date']
+                if date < min_date:
+                    min_date = date
         for node_id in nodes:
             self.network.add_node(node_id)
+            if node_id > 0:
+                self.network.add_meta_for_node(node_id, {'g': "False"})
+            else:
+                self.network.add_meta_for_node(node_id, {'g': "True"})
             date = self.posters[node_id]['date']
+            neighs_set = possible_links.get(node_id)
+            if neighs_set:
+                self.network.add_meta_for_node(node_id, {'n': len(neighs_set)})
+            else:
+                self.network.add_meta_for_node(node_id, {'n': 0})
+            if start_from_zero:
+                date -= min_date
+            if dynamic:
+                if logdyn:
+                    self.network.add_meta_for_node(node_id, {'start': math.log(date+1)})
+                else:
+                    self.network.add_meta_for_node(node_id, {'start': date})
             for node2_id in nodes:
                 if node2_id != node_id:
                     date2 = self.posters[node2_id]['date']
+                    if start_from_zero:
+                        date2 -= min_date
                     if date < date2:
-                        neighs_set = possible_links.get(node_id)
                         if neighs_set and node2_id in neighs_set:
                             self.network.add_link(node_id, node2_id, mutual=False)
+                            if dynamic:
+                                if logdyn:
+                                    self.network.add_meta_for_link(node_id, node2_id, {'start': math.log(date2+1)})
+                                else:
+                                    self.network.add_meta_for_link(node_id, node2_id, {'start': date2})
                         # print('Link: ' + str(node_id) + ' -> ' + str(node2_id))
             # print(str(node_id) + ' : ' + str(self.posters[node_id]))
 

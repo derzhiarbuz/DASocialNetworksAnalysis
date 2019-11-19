@@ -97,10 +97,10 @@ class CascadesManager(object):
         DataManager.save(self.cascades, self.base_dir + self._name + '_cascades.pkl')
         self.underlying_net.save_to_file()
 
-    def update_cascades(self, uselikes=True, usehiddens=True):
+    def update_cascades(self, uselikes=True, usehiddens=True, dynamic=True, logdyn=False, start_from_zero=False):
         existing_links = self.underlying_net.network.nodes
         for cascade in self.cascades:
-            cascade.remake_network(existing_links, uselikes, usehiddens)
+            cascade.remake_network(existing_links, uselikes, usehiddens, dynamic, logdyn, start_from_zero)
 
     def write_gexf(self, fname, trim_unchecked_nodes = True): #this function makes gexf for cascade
         file = open(fname, "w", encoding='utf-8')
@@ -238,18 +238,32 @@ class CascadesManager(object):
 
         file.close()
 
-    def write_diffusion_speed_csv(self, fname):
+    def write_diffusion_speed_csv(self, fname, post_id, derivative=False):
         file = open(fname, "w", encoding='utf-8')
         for cascade in self.cascades:
-            dates = []
-            for post_info in cascade.posters.values():
-                dates.append(post_info['date'])
-            dates.sort()
-            mindate = dates[0]
-            for i in range(len(dates)):
-                file.write(str(dates[i])+',')
-            file.write('\n')
-            for i in range(len(dates)):
-                file.write(str(i+1) + ',')
-            file.write('\n')
+            if cascade.post_meta['postinfo']['id'] == post_id:
+                dates = []
+                for post_info in cascade.posters.values():
+                    dates.append(post_info['date'])
+                dates.sort()
+                mindate = dates[0]
+                t = 0
+                dt = 7200
+                k = 1
+                if derivative:
+                    for i in range(len(dates)):
+                        time = dates[i] - mindate
+                        if time >= t and time < t + dt:
+                            k += 1
+                        else:
+                            file.write(str(t + mindate) + ',' + str(k) + '\n')
+                            k = 1
+                            t = (time // dt) * dt
+                else:
+                    for i in range(len(dates)):
+                        file.write(str(dates[i])+','+str(i)+'\n')
+                # file.write('\n')
+                # for i in range(len(dates)):
+                #     file.write(str(i+1) + ',')
+                # file.write('\n')
         file.close()

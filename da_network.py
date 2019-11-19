@@ -123,7 +123,29 @@ class Network(object):
         for edge_ids in edges:
             self.add_link(edge_ids[0], edge_ids[1], mutual)
 
-    def export_gexf(self, path, drop_singletones = False):
+    def add_meta_for_link(self, node1_id, node2_id, meta):
+        if self.optimisation == NetworkOptimisation.id_only:
+            return
+        link = self.links.get((node1_id, node2_id))
+        if link is not None:
+            for k, v in meta.items():
+                if link.get('attrs') is None:
+                    link['attrs'] = {}
+                link['attrs'][k] = v
+            if link['mutual']:
+                link2 = self.links.get((node2_id, node1_id))
+                link2['attrs'] = link['attrs']
+
+    def meta_for_link(self, node1_id, node2_id, key):
+        if self.optimisation == NetworkOptimisation.id_only:
+            return None
+        link = self.links.get((node1_id, node2_id))
+        if link is not None:
+            if link.get('attrs') is not None:
+                return link['attrs'].get(key)
+        return None
+
+    def export_gexf(self, path, drop_singletones = False, dynamic=False):
         file = open(path, 'w', encoding='utf-8')
         if not file:
             print('export_gexf failed')
@@ -139,6 +161,8 @@ class Network(object):
         # tr = {ord(a): ord(b) for a, b in zip(*symbols)}
 
         file.write('\n<graph')
+        if dynamic:
+            file.write(' mode="dynamic" timeformat="double"')
         for aname, aval in self.network_attributes.items():
             file.write(' ' + aname + '="' + aval + '"')
         file.write('>')
@@ -168,6 +192,13 @@ class Network(object):
                         continue
                 file.write('\n<node')
                 file.write(' id="' + str(node_id) + '"')
+                if dynamic:
+                    node_start = self.meta_for_node(node_id, 'start')
+                    node_end = self.meta_for_node(node_id, 'end')
+                    if node_start is not None:
+                        file.write(' start="'+str(node_start)+'"')
+                    if node_end is not None:
+                        file.write(' end="'+str(node_end)+'"')
                 file.write('>')
                 attrs = node_data.get('attrs')
                 if attrs is not None:
@@ -195,6 +226,13 @@ class Network(object):
                     file.write(' type="directed"')
                 if link_data.get('w'):
                     file.write(' weight="' + str(link_data['w']) + '"')
+                if dynamic:
+                    link_start = self.meta_for_link(link_key[0], link_key[1], 'start')
+                    link_end = self.meta_for_link(link_key[0], link_key[1], 'end')
+                    if link_start is not None:
+                        file.write(' start="'+str(link_start)+'"')
+                    if link_end is not None:
+                        file.write(' end="'+str(link_end)+'"')
                 file.write('>')
                 file.write('''</edge>''')
             file.write('''\n</edges>''')
