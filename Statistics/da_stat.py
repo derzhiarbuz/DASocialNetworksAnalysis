@@ -75,6 +75,27 @@ def exact_fisher_mc(contingency_table):
         l += 1
     return n_rejected/l
 
+def normalize_series(series: list):
+    sum = 0
+    for p in series:
+        sum += p
+    normalized = []
+    for p in series:
+        normalized.append(p/sum)
+    return normalized
+
+def confidential_from_p_series(p_series: list, conf_p = 0.95):
+    p = 1.0
+    i = 0
+    j = len(p_series) - 1
+    while p > conf_p:
+        if p_series[i] < p_series[j]:
+            p -= p_series[i]
+            i += 1
+        else:
+            p -= p_series[j]
+            j -= 1
+    return i, j
 
 if __name__ == '__main__':
     arr = np.array([[3, 0, 0],

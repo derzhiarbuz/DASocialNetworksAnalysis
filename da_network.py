@@ -49,7 +49,7 @@ class Network(object):
                 return self.nodes[node_id]
             else:
                 if include_mutual:
-                    return self.nodes[node_id]['in'] + self.nodes[node_id]['inout']
+                    return self.nodes[node_id]['in'] | self.nodes[node_id]['inout']
                 else:
                     return self.nodes[node_id]['in']
         else:
@@ -61,7 +61,7 @@ class Network(object):
                 return self.nodes[node_id]
             else:
                 if include_mutual:
-                    return self.nodes[node_id]['out'] + self.nodes[node_id]['inout']
+                    return self.nodes[node_id]['out'] | self.nodes[node_id]['inout']
                 else:
                     return self.nodes[node_id]['out']
         else:
