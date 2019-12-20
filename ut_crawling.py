@@ -9,6 +9,7 @@ from da_connections_network_manager import ConnectionsNetworkManager
 from da_icascades_manager import CascadesManager
 from da_information_conductivity import InformationConductivity
 import math
+from Statistics.da_diffusion_simulation import Simulator
 
 import da_socnetworks_crawler as crowler
 
@@ -52,11 +53,14 @@ import da_socnetworks_crawler as crowler
 
 # Komanda_Navalny_-140764628_8377_8554_8425
 # Zashitim_taigu_-164443025_8726_8021_6846
+# Komitet_Naziya_i_Svoboda_-17736722_26618
+# Navalny_live_-150565101_51320
 
-casman = CascadesManager(name='Komanda_Navalny_-140764628_8377_8554_8425', base_dir='D:/BigData/Charity/Cascades/')
+
+casman = CascadesManager(name='Komitet_Naziya_i_Svoboda_-17736722_26618', base_dir='D:/BigData/Charity/Cascades/')
 # casman.save_to_file()
 casman.load_from_file()
-# casman.schedule_crawl_posts_for_group(-140764628, 1, post_ids={8377, 8554, 8425})
+# casman.schedule_crawl_posts_for_group(-150565101, 1, post_ids={51320})
 # # casman.schedule_crawl_posts_for_group(-145583685, 500)
 # casman.continue_crawling()
 # casman.save_to_file()
@@ -83,8 +87,24 @@ casman.update_cascades(uselikes=False, usehiddens=False, logdyn=False, start_fro
 #                                  8726, derivative=True)
 for cascade in casman.cascades:
     print(cascade.post_meta)
-    if cascade.post_meta['postinfo']['id'] == 8425:
-        cascade.network.export_gexf('D:/BigData/Charity/Cascades/Komanda_Navalny_-140764628_8425.gexf', dynamic=True)
+    if cascade.post_meta['postinfo']['id'] == 26618:
+        #### estimating parameters #####
+        min_delay = cascade.get_minimum_delay()
+        outcome = cascade.get_outcome(normalization_factor=min_delay)
+        print('minimum delay: ' + str(min_delay))
+        print(outcome)
+        print(sorted(outcome.values()))
+        print(len(casman.underlying_net.network.nodes))
+        pest = Simulator.estimate_SI_relic(underlying=casman.underlying_net.network,
+                                           outcome=outcome,
+                                           theta=0.001,
+                                           relic=0.001,
+                                           initials={-17736722}, tmax=8384, dt=1, echo=True)
+        print(pest)
+        #### export graph to gefi/json #####
+#        cascade.network.export_gexf('D:/BigData/Charity/Cascades/Navalny_live_-150565101_51320.gexf',
+#                                    dynamic=True)
+        #cascade.network.export_json('D:/BigData/Charity/Cascades/Zashitim_taigu_-164443025_8021.json')
 #     print(str(len(cascade.posters)) + " " + str(len(cascade.hiddens)) + " " + str(len(cascade.likers)))
 #     print(cascade.network.nodes.keys())
 #     likes = set()

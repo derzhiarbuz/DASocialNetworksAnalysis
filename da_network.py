@@ -3,6 +3,7 @@
 
 from enum import Enum
 import datetime
+import json
 
 
 class NetworkType(Enum):
@@ -146,6 +147,8 @@ class Network(object):
         return None
 
     def export_gexf(self, path, drop_singletones = False, dynamic=False):
+        if self.optimisation != NetworkOptimisation.none:
+            return
         file = open(path, 'w', encoding='utf-8')
         if not file:
             print('export_gexf failed')
@@ -240,6 +243,41 @@ class Network(object):
         file.write("\n</graph>")
         file.write("\n</gexf>")
         file.close()
+
+    def export_json(self, path, drop_singletones = False, dynamic=False):
+        if self.optimisation != NetworkOptimisation.none:
+            return
+        file = open(path, 'w', encoding='utf-8')
+        dict_to_save = {}
+        nodes_list = []
+        dict_to_save['nodes'] = nodes_list
+        if len(self.nodes):
+            for node_id, node_data in self.nodes.items():
+                new_node = {}
+                nodes_list.append(new_node)
+                new_node['name'] = node_id
+                attrs = node_data.get('attrs')
+                if attrs is not None:
+                    new_node['meta'] = attrs
+        links_list = []
+        dict_to_save['edges'] = links_list
+        if len(self.links):
+            for link_key, link_data in self.links.items():
+                if link_data['mutual'] and link_key[0] > link_key[1]: # avoid edge duplication for undirected link
+                    continue
+                new_link = {}
+                links_list.append(new_link)
+                new_link['src'] = link_key[0]
+                new_link['dest'] = link_key[1]
+                if link_data.get('attrs') is not None:
+                    new_link['meta'] = link_data['attrs']
+                if link_data.get('w'):
+                    if new_link.get('meta') is None:
+                        new_link['meta'] = {}
+                    new_link['meta'] = {'w': link_data['w']}
+        json.dump(dict_to_save, file, indent=4)
+        file.close()
+
 
     def degree_distribution(self):
         degrees = {'in': [], 'out': [], 'inout': []}

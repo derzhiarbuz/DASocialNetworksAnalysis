@@ -129,6 +129,7 @@ class ICNetworkManager(NetworkManager):
             self.network.nodes_attributes.append({'id': 'n', 'title': 'Underlying_degree', 'type': 'integer'})
             self.network.nodes_attributes.append({'id': 'g', 'title': 'Is_group', 'type': 'boolean'})
             self.network.links_attributes.append({'id': 'start', 'title': 'start', 'type': 'float'})
+            self.network.links_attributes.append({'id': 'delay', 'title': 'delay', 'type': 'float'})
         if usehiddens:
             for node_id in self.hiddens:
                 self.network.add_node(node_id)
@@ -169,6 +170,7 @@ class ICNetworkManager(NetworkManager):
                     if date < date2:
                         if neighs_set and node2_id in neighs_set:
                             self.network.add_link(node_id, node2_id, mutual=False)
+                            self.network.add_meta_for_link(node_id, node2_id, {'delay': date2 - date})
                             if dynamic:
                                 if logdyn:
                                     self.network.add_meta_for_link(node_id, node2_id, {'start': math.log(date2+1)})
@@ -176,6 +178,26 @@ class ICNetworkManager(NetworkManager):
                                     self.network.add_meta_for_link(node_id, node2_id, {'start': date2})
                         # print('Link: ' + str(node_id) + ' -> ' + str(node2_id))
             # print(str(node_id) + ' : ' + str(self.posters[node_id]))
+
+    def get_minimum_delay(self):
+        min_delay = float('inf')
+        for link_key in self.network.links.keys():
+            delay = self.network.meta_for_link(link_key[0], link_key[1], 'delay')
+            if delay < min_delay:
+                min_delay = delay
+        return min_delay
+
+    def get_outcome(self, normalization_factor=1.0):
+        min_date = float("inf")
+        outcome = {}
+        for node_id, node_data in self.posters.items():
+            date = node_data['date']
+            if date < min_date:
+                min_date = date
+        for node_id, node_data in self.posters.items():
+            outcome[node_id] = (node_data['date'] - min_date)/normalization_factor
+        return outcome
+
 
 
 '''
