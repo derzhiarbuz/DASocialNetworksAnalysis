@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
+import math
 
 
 # nonaz_df = pd.read_csv('D:/BigData/Galina_Kovarzh/Nenatsionalnye.csv',
@@ -184,10 +185,10 @@ def test_SI_decay(ntw: Network, true_theta: float, true_decay: float):
 
     decays, thetas = np.meshgrid(decays, thetas)
 
-    # fig = plt.figure()
-    # ax = Axes3D(fig)
-    # ax.plot_surface(thetas, decays, ps, rstride=1, cstride=1, cmap=cm.viridis)
-    # plt.show()
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.plot_surface(thetas, decays, ps, rstride=1, cstride=1, cmap='twilight_shifted')
+    plt.show()
 
     plt.figure(figsize=(5, 5))
     plt.xlabel('$\\theta$ (virulence)')
@@ -363,9 +364,9 @@ def test_SI_confirm(ntw: Network, true_theta: float, true_confirm: float):
     plt.scatter([true_theta], [true_confirm], color='red', marker='o')
     plt.show()
 
-def test_SI_relic(ntw: Network, true_theta: float, true_relic: float):
+def test_SI_relic(ntw: Network, true_theta: float, true_relic: float, continuous = False):
     result = Simulator.simulate_SI_relic(underlying=ntw, theta=true_theta, relic=true_relic,
-                                           infected={1}, tmax=300, dt=1)
+                                           infected={1}, tmax=300, dt=0.01)
     print(result)
     est_th = .0
     est_dc = .0
@@ -373,16 +374,20 @@ def test_SI_relic(ntw: Network, true_theta: float, true_relic: float):
     ml_pval = 0
     total_pest = 0
     th = 0.0
-    thetas = np.arange(0, 1.01, 0.01)
-    relics = np.arange(0, 1.01, 0.01)
+    thetas = np.arange(0.001, 0.11, 0.001)
+    relics = np.arange(0.001, 0.11, 0.001)
     ps = np.zeros((len(thetas), len(relics)))
     i = 0
     for th in thetas:
         dc = 0.0
         j = 0
         for dc in relics:
-            pest = Simulator.estimate_SI_relic(underlying=ntw, outcome=result['outcome'], theta=th, relic=dc,
-                                               initials={1}, tmax=300, dt=1)
+            if continuous:
+                pest = math.exp(Simulator.estimate_SI_relic_continuous(underlying=ntw, outcome=result['outcome'], theta=th,
+                                                              relic=dc, initials={1}, tmax=30))
+            else:
+                pest = Simulator.estimate_SI_relic(underlying=ntw, outcome=result['outcome'], theta=th, relic=dc,
+                                                   initials={1}, tmax=300, dt=0.1)
 #            print(str(th) + ' ' + str(pest))
             if pest > best_pest:
                 best_pest = pest
@@ -407,7 +412,7 @@ def test_SI_relic(ntw: Network, true_theta: float, true_relic: float):
 
     plt.figure(figsize=(5, 5))
     plt.xlabel('$\\theta$ (virulence)')
-    plt.ylabel('$\\kappa$ (confirmation)')
+    plt.ylabel('$\\rho$ (background)')
     plt.contourf(thetas, relics, ps, levels=15)
     plt.scatter([est_th], [est_dc], color='blue', marker='+')
     plt.scatter([true_theta], [true_relic], color='red', marker='o')
@@ -422,4 +427,5 @@ if __name__ == '__main__':
     # print(result['p'])
     # print(Simulator.estimate_SI_recover(underlying=netwrk, outcome=result['outcome'], theta=0.05, recover_time=30,
     #                                      initials={1}, tmax=300, dt=1))
-    test_SI_decay(netwrk, 0.1, 0.2)
+    # test_SI_relic(netwrk, 0.05, 0.05)
+    test_SI_relic(netwrk, 0.05, 0.05, continuous=True)

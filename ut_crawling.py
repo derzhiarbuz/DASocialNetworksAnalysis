@@ -10,6 +10,8 @@ from da_icascades_manager import CascadesManager
 from da_information_conductivity import InformationConductivity
 import math
 from Statistics.da_diffusion_simulation import Simulator
+import numpy as np
+import matplotlib.pyplot as plt
 
 import da_socnetworks_crawler as crowler
 
@@ -95,12 +97,39 @@ for cascade in casman.cascades:
         print(outcome)
         print(sorted(outcome.values()))
         print(len(casman.underlying_net.network.nodes))
-        pest = Simulator.estimate_SI_relic(underlying=casman.underlying_net.network,
-                                           outcome=outcome,
-                                           theta=0.001,
-                                           relic=0.001,
-                                           initials={-17736722}, tmax=8384, dt=1, echo=True)
-        print(pest)
+
+        print(len(casman.underlying_net.crawled_nodes))
+        print(len(casman.underlying_net.network.nodes))
+
+        thetas = np.arange(0.00000004, 0.00000011, 0.000000002)
+        relics = np.arange(0.000000001, 0.00000002, 0.000000002)
+        ps = np.zeros((len(relics), len(thetas)))
+        max_log = -99999999.
+        for j in range(len(thetas)):
+            for i in range(len(relics)):
+                pest = Simulator.estimate_SI_relic_continuous(underlying=casman.underlying_net.network,
+                                                   outcome=outcome,
+                                                   theta=thetas[j],
+                                                   relic=relics[i],
+                                                   initials={-17736722}, tmax=8384, echo=False)
+                print(pest)
+                if pest > max_log:
+                    max_log = pest
+                ps[i][j] = pest
+        max_log -= 300
+        for j in range(len(thetas)):
+            for i in range(len(relics)):
+                if ps[i][j] >= max_log:
+                    ps[i][j] = math.exp(ps[i][j]-max_log)
+                else:
+                    ps[i][j] = .0
+        np.save('test.np', ps)
+        np.save('load.np', ps)
+        plt.figure(figsize=(5, 5))
+        plt.xlabel('$\\theta$ (virulence)')
+        plt.ylabel('$\\rho$ (background)')
+        plt.contourf(thetas, relics, ps, levels=15)
+        plt.show()
         #### export graph to gefi/json #####
 #        cascade.network.export_gexf('D:/BigData/Charity/Cascades/Navalny_live_-150565101_51320.gexf',
 #                                    dynamic=True)

@@ -92,6 +92,35 @@ class Simulator(object):
         return probability
 
     @classmethod
+    def estimate_SI_continuous(cls, underlying: Network, theta: float, outcome: dict, initials: set, immunes: set = set(),
+                    tmax=1000.0):
+        time = .0
+        my_outcome = outcome.copy()
+        susceptible = set(underlying.nodes_ids)
+        loglikelyhood = .0
+        infected = set()
+        infected |= initials
+        susceptible -= immunes | infected
+
+        prev_time = .0
+
+        for newinf_id, inf_time in my_outcome.items():
+            dt = inf_time - prev_time
+            prev_time = inf_time
+            neighbors = underlying.get_in_neighbors_for_node(newinf_id)
+            n_infected = len(neighbors & infected)
+            loglikelyhood += math.log(n_infected * theta)
+            for sus_id in susceptible:
+                sus_neighbors = underlying.get_in_neighbors_for_node(sus_id)
+                sus_n_infected = len(sus_neighbors & infected)
+                if sus_n_infected:
+                    loglikelyhood += sus_n_infected*theta*dt
+            infected.add(newinf_id)
+            if newinf_id in susceptible:
+                susceptible.remove(newinf_id)
+        return loglikelyhood
+
+    @classmethod
     def simulate_SI_decay(cls, underlying: Network, theta: float, decay: float, infected: set = None,
                           immunes: set = None, immune_p=.0, initial_p=.0, tmax=1000.0, dt=1):
         susceptible = set(underlying.nodes_ids)
@@ -129,6 +158,7 @@ class Simulator(object):
                         else: #initialy infected
                             time_gone = time
                         p_not_infected *= (1. - theta * dt * (1./(time_gone ** decay)))
+                        #p_not_infected *= (1. - theta * dt * (1. / math.exp(time_gone * decay/10.)))
                     if random.uniform(0, 1.) < (1. - p_not_infected):
                         new_infected.add(node_id)
                         outcome_infected[node_id] = time
@@ -165,6 +195,7 @@ class Simulator(object):
                         else:  # initialy infected
                             time_gone = time
                         p_not_infected *= (1. - theta * dt * (1. / (time_gone ** decay)))
+                        #p_not_infected *= (1. - theta * dt * (1. / math.exp(time_gone * decay/10.)))
                     if node_id in my_outcome.keys() and my_outcome[node_id] <= time:
                         probability *= 1.0 - p_not_infected
                         new_infected.add(node_id)
@@ -518,6 +549,131 @@ class Simulator(object):
             if echo:
                 print(str(time) + ' ' + str(probability))
         return probability
+
+    @classmethod
+    def estimate_SI_relic_continuous(cls, underlying: Network, theta: float, relic: float, outcome: dict,
+                                     initials: set, immunes: set = set(), tmax=1000.0, echo = False):
+        time = .0
+        my_outcome = []
+        for key, value in outcome.items():
+            my_outcome.append((key, value))
+        my_outcome.sort(key=lambda x: x[1])
+
+        susceptible = set(underlying.nodes_ids)
+        loglikelyhood = .0
+        infected = set()
+        infected |= initials
+        susceptible -= immunes | infected
+        leafs_dict = {}
+        n_no_inf_neighbors = 0
+
+        nn = 0
+        for node_id in underlying.nodes_ids: #make separate storage for leafs never infected (>99% of al nodes)
+            neighbors = underlying.get_in_neighbors_for_node(node_id)
+            if len(neighbors) == 1 and node_id not in outcome.keys():
+                for n in neighbors:
+                    if n in outcome.keys():
+                        if n not in leafs_dict.keys():
+                            leafs_dict[n] = 0
+                        leafs_dict[n] += 1
+                    else:
+                        n_no_inf_neighbors += 1
+                    nn += 1
+                    susceptible.remove(node_id)
+                    break
+        prev_time = .0
+
+        for newinf_id, inf_time in my_outcome:
+            if inf_time == 0.0:
+                continue
+            dt = inf_time - prev_time
+            prev_time = inf_time
+            neighbors = underlying.get_in_neighbors_for_node(newinf_id)
+            n_infected = len(neighbors & infected)
+            loglikelyhood += math.log(n_infected * theta + relic)
+            for sus_id in susceptible:
+                sus_neighbors = underlying.get_in_neighbors_for_node(sus_id)
+                sus_n_infected = len(sus_neighbors & infected)
+                if sus_n_infected > 0:
+                    loglikelyhood -= (sus_n_infected * theta + relic) * dt
+                else:
+                    loglikelyhood -= relic * dt
+            for nonleaf_id, n_leafs in leafs_dict.items():
+                if nonleaf_id in infected:
+                    loglikelyhood -= n_leafs * (theta + relic) * dt
+                else:
+                    loglikelyhood -= n_leafs * relic * dt
+            loglikelyhood -= n_no_inf_neighbors * relic * dt
+
+            infected.add(newinf_id)
+            if newinf_id in susceptible:
+                susceptible.remove(newinf_id)
+            if echo:
+                print(str(time) + ' ' + str(loglikelyhood))
+        return loglikelyhood
+
+    @classmethod
+    def estimate_SI_relic_halflife_continuous(cls, underlying: Network, theta: float, relic: float, halflife: float,
+                                              outcome: dict, initials: set, immunes: set = set(),
+                                              tmax=1000.0, echo=False):
+        time = .0
+        my_outcome = []
+        for key, value in outcome.items():
+            my_outcome.append((key, value))
+        my_outcome.sort(key=lambda x: x[1])
+
+        susceptible = set(underlying.nodes_ids)
+        loglikelyhood = .0
+        infected = set()
+        infected |= initials
+        susceptible -= immunes | infected
+        leafs_dict = {}
+        n_no_inf_neighbors = 0
+
+        nn = 0
+        for node_id in underlying.nodes_ids:  # make separate storage for leafs never infected (>99% of al nodes)
+            neighbors = underlying.get_in_neighbors_for_node(node_id)
+            if len(neighbors) == 1 and node_id not in outcome.keys():
+                for n in neighbors:
+                    if n in outcome.keys():
+                        if n not in leafs_dict.keys():
+                            leafs_dict[n] = 0
+                        leafs_dict[n] += 1
+                    else:
+                        n_no_inf_neighbors += 1
+                    nn += 1
+                    susceptible.remove(node_id)
+                    break
+        prev_time = .0
+
+        for newinf_id, inf_time in my_outcome:
+            if inf_time == 0.0:
+                continue
+            dt = inf_time - prev_time
+            prev_time = inf_time
+            neighbors = underlying.get_in_neighbors_for_node(newinf_id)
+            n_infected = len(neighbors & infected)
+            loglikelyhood += math.log(n_infected * theta + relic)
+            for sus_id in susceptible:
+                sus_neighbors = underlying.get_in_neighbors_for_node(sus_id)
+                sus_n_infected = len(sus_neighbors & infected)
+                if sus_n_infected > 0:
+                    loglikelyhood -= (sus_n_infected * theta + relic) * dt
+                else:
+                    loglikelyhood -= relic * dt
+            for nonleaf_id, n_leafs in leafs_dict.items():
+                if nonleaf_id in infected:
+                    loglikelyhood -= n_leafs * (theta + relic) * dt
+                else:
+                    loglikelyhood -= n_leafs * relic * dt
+            loglikelyhood -= n_no_inf_neighbors * relic * dt
+
+            infected.add(newinf_id)
+            if newinf_id in susceptible:
+                susceptible.remove(newinf_id)
+            if echo:
+                print(str(time) + ' ' + str(loglikelyhood))
+        return loglikelyhood
 
     @classmethod
     def simulate_SIR(cls, underlying: Network, theta: float, infected: set = None, immunes: set = None,
