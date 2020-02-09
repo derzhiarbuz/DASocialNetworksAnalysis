@@ -13,17 +13,22 @@ class ConnectionsNetworkManager(NetworkManager):
         super().__init__(net, name, base_dir)
         self.nodes_meta = {}
         self.crawled_nodes = set()
+        self.counters_meta = {}
 
     def get_data_dict(self):
         data_dict = super().get_data_dict()
         data_dict['nodes_meta'] = self.nodes_meta
         data_dict['scanned_nodes'] = self.crawled_nodes
+        data_dict['counters_meta'] = self.counters_meta
         return data_dict
 
     def set_data_dict(self, data_dict):
         super().set_data_dict(data_dict)
         self.nodes_meta = data_dict['nodes_meta']
         self.crawled_nodes = data_dict['scanned_nodes']
+        if data_dict.get('counters_meta') is None:
+            data_dict['counters_meta'] = {}
+        self.counters_meta = data_dict['counters_meta']
 
     def load_from_file(self, crowled_only=False):
         if crowled_only:
@@ -64,6 +69,22 @@ class ConnectionsNetworkManager(NetworkManager):
                        'groups_left': groups_left}
             self.crawl_plan.append(crawler)
 
+    def schedule_load_counters_meta(self): #this stub function collects degrees of uncrawled nodes
+        nodes_to_load = self.network.nodes_ids - self.counters_meta.keys()
+        print(nodes_to_load)
+        if len(nodes_to_load):
+            users_left = set()
+            groups_left = set()
+            for node_id in nodes_to_load:
+                if node_id < 0:
+                    groups_left.add(node_id)
+                else:
+                    users_left.add(node_id)
+            crawler = {'type': 'umeta',
+                       'users_left': users_left,
+                       'groups_left': groups_left}
+            self.crawl_plan.append(crawler)
+
     def crawl_next(self):
         while len(self.crawl_plan) != 0:
             result = 'done'
@@ -74,6 +95,9 @@ class ConnectionsNetworkManager(NetworkManager):
                 result = self.crawl_ego(crawler)
             elif crawler['type'] == 'meta':
                 result = self.crawl_meta(crawler)
+            elif crawler['type'] == 'umeta':
+                result = self.crawl_counters_meta(crawler)
+                print(len(self.counters_meta))
 
             if result == 'empty':
                 self.crawl_plan.pop(0)
@@ -170,6 +194,53 @@ class ConnectionsNetworkManager(NetworkManager):
                     self.add_vk_groups_meta(groups)
             else:
                 return 'empty'
+        return 'done'
+
+    def crawl_counters_meta(self, crawler):
+        users_left = crawler['users_left']
+        groups_left = crawler['groups_left']
+        ids_to_crawl = set()
+        if self.source == NetworkSource.vkontakte:
+            i = 0
+            if len(users_left):
+                while i < 4 and len(users_left):
+                    ids_to_crawl.add(users_left.pop())
+                    i += 1
+                users = crlr.get_vk_users(ids_to_crawl, only_counters=True, batch_size=1, async_load=True)
+                if vk.is_error(users):  # douwnloading error occured
+                    ec = users['error']['error_code']
+                    print('Error: ' + str(ec) + ' ' +
+                          users['error']['error_msg'])
+                    if ec <= 10:    # connection or access error (accident stop)
+                        print('Error: ' + str(ec) + ' ' +
+                              users['error']['error_msg'])
+                        users_left.update(ids_to_crawl)
+                        if ec == 6:
+                            return 'done'
+                        return 'error'
+                else:
+                    self.add_vk_users_degrees(users)
+            elif len(groups_left):
+                while i < 500 and len(groups_left):
+                    ids_to_crawl.add(groups_left.pop())
+                    i += 1
+                groups = crlr.get_vk_groups(ids_to_crawl, only_members=True)
+                if vk.is_error(groups):  # douwnloading error occured
+                    ec = groups['error']['error_code']
+                    print('Error: ' + str(ec) + ' ' +
+                          groups['error']['error_msg'])
+                    if ec <= 10:    # connection or access error (accident stop)
+                        print('Error: ' + str(ec) + ' ' +
+                              groups['error']['error_msg'])
+                        groups_left.update(ids_to_crawl)
+                        if ec == 6:
+                            return 'done'
+                        return 'error'
+                else:
+                    self.add_vk_groups_degrees(groups)
+            else:
+                return 'empty'
+        return 'done'
 
     def add_vk_neighbors(self, node_id, neighbors, meta=False):
         self.crawled_nodes.add(node_id)
@@ -194,3 +265,24 @@ class ConnectionsNetworkManager(NetworkManager):
         for group in groups:
             gid = -int(group['id'])
             self.nodes_meta[gid] = group
+
+    def add_vk_users_degrees(self, users):
+        for user in users:
+            uid = int(user['id'])
+            print(user)
+            deactivated = 0
+            if user.get('deactivated'):
+                if user['deactivated'] == 'deleted':
+                    deactivated = 1
+                elif user['deactivated'] == 'banned':
+                    deactivated = 2
+            self.counters_meta[uid] = (0, deactivated)
+            if user.get('counters'):
+                if user['counters'].get('friends'):
+                    self.counters_meta[uid] = (user['counters']['friends'], deactivated)
+
+    def add_vk_groups_degrees(self, groups):
+        for group in groups:
+            print(group)
+            gid = -int(group['id'])
+            self.counters_meta[gid] = (0, 0) #there is no friends of groups

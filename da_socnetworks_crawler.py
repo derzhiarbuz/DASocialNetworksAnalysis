@@ -13,22 +13,44 @@ VK_GROUP_META_FIELDS = 'screen_name, name, is_closed, deactivated, type, activit
                        'counters, description, links, place, site, start_date, finish_date, status, trending'
 
 
-def get_vk_users(user_ids):
+def get_vk_users(user_ids, only_counters=False, batch_size=1000, async_load=False):
     i = 0
     n = 0
+    k = 0
     error = None
     uids_str = ''
     users_data = []
+    requests = []
+    if async_load:
+        n_requests = len(vk.get_tokens())
+    else:
+        n_requests = 1
+    if only_counters:
+        fields = 'counters'
+    else:
+        fields = VK_USER_META_FIELDS
     for uid in user_ids:
         uids_str += str(uid)
         i += 1
         n += 1
-        if i == 1000 or n == len(user_ids):
-            users = vk.api('users.get', {'user_ids': uids_str, 'fields': VK_USER_META_FIELDS}, ispost=True)
-            if vk.check(users):
-                users_data += users['response']
-            else:
-                error = users
+        if i == batch_size or n == len(user_ids):
+            requests.append({'user_ids': uids_str, 'fields': fields})
+            k += 1
+            if k == n_requests or n == len(user_ids):
+                if async_load:
+                    result = vk.api_batch('users.get', requests, ispost=True)
+                    for users in result:
+                        if vk.check(users):
+                            users_data += users['response']
+                        else:
+                            error = users
+                else:
+                    for params in requests:
+                        users = vk.api('users.get', params, ispost=True)
+                        if vk.check(users):
+                            users_data += users['response']
+                        else:
+                            error = users
             i = 0
             uids_str = ''
         else:
@@ -40,7 +62,7 @@ def get_vk_users(user_ids):
         return error
 
 
-def get_vk_groups(group_ids):
+def get_vk_groups(group_ids, only_members=False):
     i = 0
     n = 0
     error = None
@@ -51,7 +73,10 @@ def get_vk_groups(group_ids):
         i += 1
         n += 1
         if i == 500 or n == len(group_ids):
-            groups = vk.api('groups.getById', {'group_ids': gids_str, 'fields': VK_GROUP_META_FIELDS}, ispost=True)
+            if only_members:
+                groups = vk.api('groups.getById', {'group_ids': gids_str, 'fields': 'members_count'}, ispost=True)
+            else:
+                groups = vk.api('groups.getById', {'group_ids': gids_str, 'fields': VK_GROUP_META_FIELDS}, ispost=True)
             if vk.check(groups):
                 groups_data += groups['response']
             else:

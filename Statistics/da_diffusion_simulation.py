@@ -157,8 +157,8 @@ class Simulator(object):
                             time_gone = time - time_gone
                         else: #initialy infected
                             time_gone = time
-                        p_not_infected *= (1. - theta * dt * (1./(time_gone ** decay)))
-                        #p_not_infected *= (1. - theta * dt * (1. / math.exp(time_gone * decay/10.)))
+                        #p_not_infected *= (1. - theta * dt * (1./(time_gone ** decay)))
+                        p_not_infected *= (1. - theta * dt * (math.exp(-time_gone * decay)))
                     if random.uniform(0, 1.) < (1. - p_not_infected):
                         new_infected.add(node_id)
                         outcome_infected[node_id] = time
@@ -426,7 +426,17 @@ class Simulator(object):
                 neighbors = underlying.get_in_neighbors_for_node(node_id)
                 n_infected = len(neighbors & my_infected)
                 if n_infected > 0:
-                    p_not_infected = (1. - theta * dt) ** (n_infected ** (confirm+1))
+                    if confirm >= .0:
+                        if n_infected / len(neighbors) >= confirm:
+                            p_not_infected = (1. - theta * dt) ** n_infected
+                        else:
+                            p_not_infected = (1. - theta / 10. * dt) ** n_infected
+                    elif confirm < .0:
+                        if n_infected / len(neighbors) < -confirm:
+                            p_not_infected = (1. - theta * dt) ** n_infected
+                        else:
+                            p_not_infected = (1. - theta / 10. * dt) ** n_infected
+                    # p_not_infected = (1. - theta * dt) ** (n_infected ** (confirm+1))
                     if random.uniform(0, 1.) < (1. - p_not_infected):
                         new_infected.add(node_id)
                         outcome_infected[node_id] = time
@@ -455,7 +465,17 @@ class Simulator(object):
                 neighbors = underlying.get_in_neighbors_for_node(node_id)
                 n_infected = len(neighbors & infected)
                 if n_infected > 0 or (node_id in my_outcome.keys() and my_outcome[node_id] < time):
-                    p_not_infected = (1. - theta * dt) ** (n_infected ** (confirm+1))
+                    if confirm >= .0:
+                        if n_infected / len(neighbors) >= confirm:
+                            p_not_infected = (1. - theta * dt) ** n_infected
+                        else:
+                            p_not_infected = (1. - theta / 10. * dt) ** n_infected
+                    elif confirm < .0:
+                        if n_infected / len(neighbors) < -confirm:
+                            p_not_infected = (1. - theta * dt) ** n_infected
+                        else:
+                            p_not_infected = (1. - theta / 10. * dt) ** n_infected
+                    #p_not_infected = (1. - theta * dt) ** (n_infected ** (confirm+1))
                     if node_id in my_outcome.keys() and my_outcome[node_id] <= time:
                         probability *= 1.0 - p_not_infected
                         new_infected.add(node_id)
@@ -572,14 +592,15 @@ class Simulator(object):
             neighbors = underlying.get_in_neighbors_for_node(node_id)
             if len(neighbors) == 1 and node_id not in outcome.keys():
                 for n in neighbors:
-                    if n in outcome.keys():
+                    if n in (outcome.keys() | initials):
                         if n not in leafs_dict.keys():
                             leafs_dict[n] = 0
                         leafs_dict[n] += 1
                     else:
-                        n_no_inf_neighbors += 1
+                        n_no_inf_neighbors += 1  #leafs having no infected neighbors (>80% of all nodes)
                     nn += 1
-                    susceptible.remove(node_id)
+                    if node_id in susceptible:
+                        susceptible.remove(node_id)
                     break
         prev_time = .0
 
@@ -629,20 +650,24 @@ class Simulator(object):
         susceptible -= immunes | infected
         leafs_dict = {}
         n_no_inf_neighbors = 0
+        virulences = {}
+        for inf_id in infected:
+            virulences[inf_id] = [halflife, theta, 0.]
 
         nn = 0
-        for node_id in underlying.nodes_ids:  # make separate storage for leafs never infected (>99% of al nodes)
+        for node_id in underlying.nodes_ids:  # make separate storage for leafs never infected (>99% of all nodes)
             neighbors = underlying.get_in_neighbors_for_node(node_id)
             if len(neighbors) == 1 and node_id not in outcome.keys():
                 for n in neighbors:
-                    if n in outcome.keys():
+                    if n in (outcome.keys() | initials):
                         if n not in leafs_dict.keys():
                             leafs_dict[n] = 0
                         leafs_dict[n] += 1
                     else:
-                        n_no_inf_neighbors += 1
+                        n_no_inf_neighbors += 1 #leafs having no infected neighbors (>80% of all nodes)
                     nn += 1
-                    susceptible.remove(node_id)
+                    if node_id in susceptible:
+                        susceptible.remove(node_id)
                     break
         prev_time = .0
 
@@ -651,24 +676,157 @@ class Simulator(object):
                 continue
             dt = inf_time - prev_time
             prev_time = inf_time
-            neighbors = underlying.get_in_neighbors_for_node(newinf_id)
-            n_infected = len(neighbors & infected)
-            loglikelyhood += math.log(n_infected * theta + relic)
+            #calculating integrated infection rates
+            for inf_id, value in virulences.items():
+                if dt > value[0]: #dt * theta
+                    value[2] = value[0] * value[1]
+                else:
+                    value[2] = dt * value[1]
+                value[0] -= dt
+                while value[0] < .0:
+                    value[1] /= 2  # halflifing
+                    value[0] += halflife
+                    if value[0] < .0:
+                        value[2] += value[1] * halflife
+                    else:
+                        value[2] += value[1] * (halflife - value[0])
+
+            #calculating multipliers for no infection time
             for sus_id in susceptible:
                 sus_neighbors = underlying.get_in_neighbors_for_node(sus_id)
-                sus_n_infected = len(sus_neighbors & infected)
-                if sus_n_infected > 0:
-                    loglikelyhood -= (sus_n_infected * theta + relic) * dt
+                sus_inf_neighbors = sus_neighbors & infected
+                if len(sus_inf_neighbors) > 0:
+                    inf_rate = 0
+                    for inf_id in sus_inf_neighbors:  # calculate total infection rate
+                        inf_rate += virulences[inf_id][2]
+                    loglikelyhood -= inf_rate + relic * dt
                 else:
                     loglikelyhood -= relic * dt
             for nonleaf_id, n_leafs in leafs_dict.items():
                 if nonleaf_id in infected:
-                    loglikelyhood -= n_leafs * (theta + relic) * dt
+                    loglikelyhood -= n_leafs * (virulences[nonleaf_id][2] + relic * dt)
                 else:
                     loglikelyhood -= n_leafs * relic * dt
             loglikelyhood -= n_no_inf_neighbors * relic * dt
 
+            #calculating multiplier for infection
+            neighbors = underlying.get_in_neighbors_for_node(newinf_id)
+            inf_rate = 0
+            for inf_id in neighbors & infected: #calculate total infection rate
+                inf_rate += virulences[inf_id][1]
+            loglikelyhood += math.log(inf_rate + relic)
+
             infected.add(newinf_id)
+            virulences[newinf_id] = [halflife, theta, 0.]
+            if newinf_id in susceptible:
+                susceptible.remove(newinf_id)
+            if echo:
+                print(str(time) + ' ' + str(loglikelyhood))
+        return loglikelyhood
+
+    @classmethod
+    def estimate_SI_relic_decay_confirm_continuous(cls, underlying: Network, theta: float, relic: float, decay: float,
+                                                    confirm: .0, confirm_drop: 0.1,
+                                                    outcome: dict, initials: set, immunes: set = set(),
+                                                    tmax=1000.0, echo=False, leafs_degrees={}):
+        time = .0
+        my_outcome = []
+        for key, value in outcome.items():
+            my_outcome.append((key, value))
+        my_outcome.sort(key=lambda x: x[1])
+
+        susceptible = set(underlying.nodes_ids)
+        loglikelyhood = .0
+        infected = set()
+        infected |= initials
+        susceptible -= immunes | infected
+        leafs_dict = {}
+        n_no_inf_neighbors = 0
+        virulences = {}
+        for inf_id in infected:
+            virulences[inf_id] = [0, .0, theta] #[start time, integrated, last point]
+
+        nn = 0
+        for node_id in underlying.nodes_ids:  # make separate storage for leafs never infected (>99% of all nodes)
+            neighbors = underlying.get_in_neighbors_for_node(node_id)
+            if len(neighbors) == 1 and node_id not in outcome.keys():
+                for n in neighbors:
+                    if n in (outcome.keys() | initials):
+                        if n not in leafs_dict.keys():
+                            leafs_dict[n] = 0
+                        leafs_dict[n] += 1
+                    else:
+                        n_no_inf_neighbors += 1  # leafs having no infected neighbors (>80% of all nodes)
+                    nn += 1
+                    if node_id in susceptible:
+                        susceptible.remove(node_id)
+                    break
+        prev_time = .0
+
+        for newinf_id, inf_time in my_outcome:
+            if inf_time == 0.0:
+                continue
+            # calculating integrated infection rates
+            for inf_id, value in virulences.items():
+                value[1] = theta/decay*(math.exp(decay*(value[0] - prev_time)) - math.exp(decay*(value[0] - inf_time)))
+                value[2] = theta*math.exp(decay*(value[0] - inf_time))
+            dt = inf_time - prev_time
+            prev_time = inf_time
+
+
+            # calculating multipliers for no infection time
+            for sus_id in susceptible:
+                sus_neighbors = underlying.get_in_neighbors_for_node(sus_id)
+                sus_inf_neighbors = sus_neighbors & infected
+                if len(sus_inf_neighbors) > 0:
+                    inf_rate = 0
+                    cd = 1.
+                    n_neighbors = len(sus_neighbors)
+                    if sus_id in leafs_degrees.keys():
+                        n_neighbors = leafs_degrees[sus_id]
+                        if n_neighbors == 0:
+                            n_neighbors = 100
+                    else:
+                        n_neighbors = len(sus_neighbors)
+                    if confirm > .0:
+                        if len(sus_inf_neighbors)/n_neighbors < confirm:
+                            cd = confirm_drop
+                    elif confirm < .0:
+                        if len(sus_inf_neighbors)/n_neighbors > 1. + confirm:
+                            cd = confirm_drop
+                    for inf_id in sus_inf_neighbors:  # calculate total infection rate
+                        inf_rate += virulences[inf_id][1]
+                    loglikelyhood -= cd * inf_rate + relic * dt
+                else:
+                    loglikelyhood -= relic * dt
+            for nonleaf_id, n_leafs in leafs_dict.items():
+                if nonleaf_id in infected:
+                    #assume that all leafs have enough uninfected friends to not beat the treshold
+                    cd = 1.
+                    if confirm != 0:
+                        cd = confirm_drop
+                    loglikelyhood -= n_leafs * (cd * virulences[nonleaf_id][1] + relic * dt)
+                else:
+                    loglikelyhood -= n_leafs * relic * dt
+            loglikelyhood -= n_no_inf_neighbors * relic * dt
+
+            # calculating multiplier for infection
+            neighbors = underlying.get_in_neighbors_for_node(newinf_id)
+            infected_nbrs = neighbors & infected
+            inf_rate = 0
+            cd = 1.
+            if confirm > .0:
+                if len(infected_nbrs) / len(neighbors) < confirm:
+                    cd = confirm_drop
+            elif confirm < .0:
+                if len(infected_nbrs) / len(neighbors) > -confirm:
+                    cd = confirm_drop
+            for inf_id in infected_nbrs:  # calculate total infection rate
+                inf_rate += virulences[inf_id][2]
+            loglikelyhood += math.log(cd * inf_rate + relic)
+
+            infected.add(newinf_id)
+            virulences[newinf_id] = [inf_time, .0, theta]
             if newinf_id in susceptible:
                 susceptible.remove(newinf_id)
             if echo:

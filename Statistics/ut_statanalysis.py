@@ -142,9 +142,12 @@ def test_SI(ntw: Network, true_theta: float):
     pyplot.show()
 
 
-def test_SI_decay(ntw: Network, true_theta: float, true_decay: float):
+def test_SI_decay(ntw: Network, true_theta: float, true_decay: float, continuous = False):
+    dt = 1
+    if continuous:
+        dt = 0.01
     result = Simulator.simulate_SI_decay(underlying=ntw, theta=true_theta, decay=true_decay,
-                                         infected={1}, tmax=300, dt=1)
+                                         infected={1}, tmax=300, dt=dt)
     print(result)
     est_th = .0
     est_dc = .0
@@ -152,16 +155,22 @@ def test_SI_decay(ntw: Network, true_theta: float, true_decay: float):
     ml_pval = 0
     total_pest = 0
     th = 0.0
-    thetas = np.arange(0, 0.5, 0.01)
-    decays = np.arange(0, 1, 0.01)
+    thetas = np.arange(0.01, 1, 0.01)
+    decays = np.arange(0.001, 0.1, 0.001)
     ps = np.zeros((len(thetas), len(decays)))
     i = 0
     for th in thetas:
         dc = 0.0
         j = 0
         for dc in decays:
-            pest = Simulator.estimate_SI_decay(underlying=ntw, outcome=result['outcome'], theta=th, decay=dc,
-                                               initials={1}, tmax=300, dt=1)
+            if continuous:
+                pest = math.exp(Simulator.estimate_SI_relic_decay_confirm_continuous(underlying=ntw,
+                                                                                     outcome=result['outcome'],
+                                                                                     theta=th, decay=dc, relic=.0,
+                                                                                     initials={1}, tmax=300))
+            else:
+                pest = Simulator.estimate_SI_decay(underlying=ntw, outcome=result['outcome'], theta=th, decay=dc,
+                                                   initials={1}, tmax=300, dt=dt)
 #            print(str(th) + ' ' + str(pest))
             if pest > best_pest:
                 best_pest = pest
@@ -185,10 +194,10 @@ def test_SI_decay(ntw: Network, true_theta: float, true_decay: float):
 
     decays, thetas = np.meshgrid(decays, thetas)
 
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.plot_surface(thetas, decays, ps, rstride=1, cstride=1, cmap='twilight_shifted')
-    plt.show()
+    # fig = plt.figure()
+    # ax = Axes3D(fig)
+    # ax.plot_surface(thetas, decays, ps, rstride=1, cstride=1, cmap='twilight_shifted')
+    # plt.show()
 
     plt.figure(figsize=(5, 5))
     plt.xlabel('$\\theta$ (virulence)')
@@ -256,9 +265,12 @@ def test_SI_recover(ntw: Network, true_theta: float, true_recover_time: float):
     plt.show()
 
 
-def test_SI_halflife(ntw: Network, true_theta: float, true_halflife: float):
+def test_SI_halflife(ntw: Network, true_theta: float, true_halflife: float, continuous = False):
+    dt = 1
+    if continuous:
+        dt = 0.01
     result = Simulator.simulate_SI_halflife(underlying=ntw, theta=true_theta, halflife=true_halflife,
-                                           infected={1}, tmax=300, dt=1)
+                                           infected={1}, tmax=300, dt=dt)
     #result = Simulator.simulate_SI(underlying=ntw, theta=true_theta, infected={1}, tmax=300, dt=1)
     print(result)
     est_th = .0
@@ -267,16 +279,23 @@ def test_SI_halflife(ntw: Network, true_theta: float, true_halflife: float):
     ml_pval = 0
     total_pest = 0
     th = 0.0
-    thetas = np.arange(0, 1, 0.01)
+    thetas = np.arange(0.001, 1.001, 0.01)
+    #thetas = np.array([true_theta])
     recovers = np.arange(1, 50, 0.5)
+    #recovers = np.array([true_halflife])
     ps = np.zeros((len(thetas), len(recovers)))
     i = 0
     for th in thetas:
         dc = 0.0
         j = 0
         for dc in recovers:
-            pest = Simulator.estimate_SI_halflife(underlying=ntw, outcome=result['outcome'], theta=th, halflife=dc,
-                                               initials={1}, tmax=300, dt=1)
+            if continuous:
+                pest = math.exp(Simulator.estimate_SI_relic_halflife_continuous(underlying=ntw, outcome=result['outcome'],
+                                                                       theta=th, halflife=dc, relic=.0,
+                                                                       initials={1}, tmax=300))
+            else:
+                pest = Simulator.estimate_SI_halflife(underlying=ntw, outcome=result['outcome'], theta=th, halflife=dc,
+                                                      initials={1}, tmax=300, dt=dt)
 #            print(str(th) + ' ' + str(pest))
             if pest > best_pest:
                 best_pest = pest
@@ -314,9 +333,12 @@ def test_SI_halflife(ntw: Network, true_theta: float, true_halflife: float):
     plt.show()
 
 
-def test_SI_confirm(ntw: Network, true_theta: float, true_confirm: float):
+def test_SI_confirm(ntw: Network, true_theta: float, true_confirm: float, continuous = False):
+    dt = 1
+    if continuous:
+        dt = 0.01
     result = Simulator.simulate_SI_confirm(underlying=ntw, theta=true_theta, confirm=true_confirm,
-                                         infected={1}, tmax=300, dt=1)
+                                         infected={1}, tmax=300, dt=dt)
     print(result)
     est_th = .0
     est_dc = .0
@@ -324,16 +346,24 @@ def test_SI_confirm(ntw: Network, true_theta: float, true_confirm: float):
     ml_pval = 0
     total_pest = 0
     th = 0.0
-    thetas = np.arange(0, 1.01, 0.01)
-    confirms = np.arange(-2, 2.01, 0.1)
+    thetas = np.arange(0.01, 1.01, 0.01)
+    #confirms = np.arange(-2, 2.01, 0.1)
+    confirms = np.arange(-1, 1, 0.01)
     ps = np.zeros((len(thetas), len(confirms)))
     i = 0
     for th in thetas:
         dc = 0.0
         j = 0
         for dc in confirms:
-            pest = Simulator.estimate_SI_confirm(underlying=ntw, outcome=result['outcome'], theta=th, confirm=dc,
-                                               initials={1}, tmax=300, dt=1)
+            if continuous:
+                pest = math.exp(Simulator.estimate_SI_relic_decay_confirm_continuous(underlying=ntw,
+                                                                                     outcome=result['outcome'],
+                                                                                     theta=th, decay=.000001, relic=.0,
+                                                                                     confirm=dc, confirm_drop=0.1,
+                                                                                     initials={1}, tmax=300))
+            else:
+                pest = Simulator.estimate_SI_confirm(underlying=ntw, outcome=result['outcome'], theta=th, confirm=dc,
+                                                     initials={1}, tmax=300, dt=dt)
 #            print(str(th) + ' ' + str(pest))
             if pest > best_pest:
                 best_pest = pest
@@ -365,8 +395,11 @@ def test_SI_confirm(ntw: Network, true_theta: float, true_confirm: float):
     plt.show()
 
 def test_SI_relic(ntw: Network, true_theta: float, true_relic: float, continuous = False):
+    dt = 1
+    if continuous:
+        dt = 0.01
     result = Simulator.simulate_SI_relic(underlying=ntw, theta=true_theta, relic=true_relic,
-                                           infected={1}, tmax=300, dt=0.01)
+                                           infected={1}, tmax=300, dt=dt)
     print(result)
     est_th = .0
     est_dc = .0
@@ -387,7 +420,7 @@ def test_SI_relic(ntw: Network, true_theta: float, true_relic: float, continuous
                                                               relic=dc, initials={1}, tmax=30))
             else:
                 pest = Simulator.estimate_SI_relic(underlying=ntw, outcome=result['outcome'], theta=th, relic=dc,
-                                                   initials={1}, tmax=300, dt=0.1)
+                                                   initials={1}, tmax=300, dt=dt)
 #            print(str(th) + ' ' + str(pest))
             if pest > best_pest:
                 best_pest = pest
@@ -428,4 +461,4 @@ if __name__ == '__main__':
     # print(Simulator.estimate_SI_recover(underlying=netwrk, outcome=result['outcome'], theta=0.05, recover_time=30,
     #                                      initials={1}, tmax=300, dt=1))
     # test_SI_relic(netwrk, 0.05, 0.05)
-    test_SI_relic(netwrk, 0.05, 0.05, continuous=True)
+    test_SI_confirm(netwrk, 0.1, 0.3, continuous=True)

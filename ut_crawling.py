@@ -59,7 +59,7 @@ import da_socnetworks_crawler as crowler
 # Navalny_live_-150565101_51320
 
 
-casman = CascadesManager(name='Komitet_Naziya_i_Svoboda_-17736722_26618', base_dir='D:/BigData/Charity/Cascades/')
+casman = CascadesManager(name='Zashitim_taigu_-164443025_8726_8021_6846', base_dir='D:/BigData/Charity/Cascades/')
 # casman.save_to_file()
 casman.load_from_file()
 # casman.schedule_crawl_posts_for_group(-150565101, 1, post_ids={51320})
@@ -89,47 +89,90 @@ casman.update_cascades(uselikes=False, usehiddens=False, logdyn=False, start_fro
 #                                  8726, derivative=True)
 for cascade in casman.cascades:
     print(cascade.post_meta)
-    if cascade.post_meta['postinfo']['id'] == 26618:
+    if cascade.post_meta['postinfo']['id'] == 8726:
+
         #### estimating parameters #####
         min_delay = cascade.get_minimum_delay()
         outcome = cascade.get_outcome(normalization_factor=min_delay)
         print('minimum delay: ' + str(min_delay))
-        print(outcome)
-        print(sorted(outcome.values()))
-        print(len(casman.underlying_net.network.nodes))
+        # print(outcome)
+        # print(sorted(outcome.values()))
+        # print(len(casman.underlying_net.network.nodes))
+        #
+        # print(len(casman.underlying_net.crawled_nodes))
+        # print(len(casman.underlying_net.network.nodes))
+        # print(len(casman.underlying_net.counters_meta))
+        # casman.underlying_net.crawl_plan = []
+        # casman.underlying_net.schedule_load_counters_meta()
+        # casman.continue_crawling()
+        # casman.save_to_file()
 
-        print(len(casman.underlying_net.crawled_nodes))
-        print(len(casman.underlying_net.network.nodes))
+        # thetas = np.arange(0.000014, 0.000020, 0.0000009)
+        # relics = np.arange(0.00000001, 0.0000002, 0.00000003)
+        # relics = np.array([1e-08])
+        # decays = np.arange(0.0001, 0.005, 0.001)
+        # decays = np.array([8.5e-04])
+        # confirms = np.arange(-0.95, 1.1, 0.2)
+        # print(thetas)
+        # print(decays)
+        # ests = {'theta': .0, 'relic': .0, 'halflife': .0}
+        # ps = np.zeros((len(relics), len(thetas), len(decays), len(confirms)))
+        # max_log = -99999999.
+        # N = len(thetas) * len(relics) * len(decays) * len(confirms)
+        # n = 0
+        # relic_est_i = 0
+        # decay_est_k = 0
+        # for j in range(len(thetas)):
+        #     for i in range(len(relics)):
+        #         for k in range(len(decays)):
+        #             for l in range(len(confirms)):
+        #                 n+=1
+        #                 print(str(n) + ' of ' + str(N))
+        #                 pest = Simulator.estimate_SI_relic_decay_confirm_continuous(underlying=casman.underlying_net.network,
+        #                                                                     outcome=outcome,
+        #                                                                     theta=thetas[j],
+        #                                                                     relic=relics[i],
+        #                                                                     decay=decays[k],
+        #                                                                     confirm=confirms[l],
+        #                                                                     confirm_drop=0.1,
+        #                                                                     initials={-17736722}, tmax=8384, echo=False,
+        #                                                                             leafs_degrees=casman.underlying_net.uncrawled_meta)
+        #                 print(pest)
+        #                 if pest > max_log:
+        #                     max_log = pest
+        #                     relic_est_i = i
+        #                     decay_est_k = k
+        #                     ests['theta'] = thetas[j]
+        #                     ests['relic'] = relics[i]
+        #                     ests['decay'] = decays[k]
+        #                     ests['confirm'] = confirms[l]
+        #                 ps[i][j][k][l] = pest
+        # max_log -= 300
+        # np.save('test_halflife_5.np', ps)
+        # ps = np.load('test_halflife_5.np.npy')
+        # print(ests)
+        # z = np.zeros((len(confirms), len(thetas)))
+        # print(z.shape)
+        # print(ps[0])
+        # for j in range(len(thetas)):
+        #     for l in range(len(confirms)):
+        #         if ps[relic_est_i][j][decay_est_k][l] > max_log:
+        #             max_log = ps[relic_est_i][j][decay_est_k][l]
+        # max_log -= 300
+        # for j in range(len(thetas)):
+        #     for l in range(len(confirms)):
+        #         if ps[relic_est_i][j][decay_est_k][l] >= max_log:
+        #             z[l][j] = math.exp(ps[relic_est_i][j][decay_est_k][l] - max_log)
+        #         else:
+        #             z[l][j] = .0
+        # print(z)
+        # plt.figure(figsize=(5, 5))
+        # plt.xlabel('$\\theta$ (virulence)')
+        # plt.ylabel('$\\rho$ (background)')
+        # plt.contourf(thetas, confirms, z, levels=15)
+        # plt.show()
 
-        thetas = np.arange(0.00000004, 0.00000011, 0.000000002)
-        relics = np.arange(0.000000001, 0.00000002, 0.000000002)
-        ps = np.zeros((len(relics), len(thetas)))
-        max_log = -99999999.
-        for j in range(len(thetas)):
-            for i in range(len(relics)):
-                pest = Simulator.estimate_SI_relic_continuous(underlying=casman.underlying_net.network,
-                                                   outcome=outcome,
-                                                   theta=thetas[j],
-                                                   relic=relics[i],
-                                                   initials={-17736722}, tmax=8384, echo=False)
-                print(pest)
-                if pest > max_log:
-                    max_log = pest
-                ps[i][j] = pest
-        max_log -= 300
-        for j in range(len(thetas)):
-            for i in range(len(relics)):
-                if ps[i][j] >= max_log:
-                    ps[i][j] = math.exp(ps[i][j]-max_log)
-                else:
-                    ps[i][j] = .0
-        np.save('test.np', ps)
-        np.save('load.np', ps)
-        plt.figure(figsize=(5, 5))
-        plt.xlabel('$\\theta$ (virulence)')
-        plt.ylabel('$\\rho$ (background)')
-        plt.contourf(thetas, relics, ps, levels=15)
-        plt.show()
+
         #### export graph to gefi/json #####
 #        cascade.network.export_gexf('D:/BigData/Charity/Cascades/Navalny_live_-150565101_51320.gexf',
 #                                    dynamic=True)

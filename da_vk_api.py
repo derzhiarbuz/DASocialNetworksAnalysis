@@ -5,9 +5,11 @@ import requests
 import json
 from pymongo import MongoClient
 import datetime
+import aiohttp
+import asyncio
 
 API_BASE = 'https://api.vk.com/method/'
-API_VERSION = '5.92'
+API_VERSION = '5.103'
 
 APP_ID1 = '6759333' #me
 TOKEN_REQUEST1 = 'https://oauth.vk.com/authorize?client_id=6759333&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.92'
@@ -24,10 +26,10 @@ TOKEN_REQUEST5 = 'https://oauth.vk.com/authorize?client_id=7041064&display=page&
 
 ACCESS_TOKEN = '57a837765997b5bfc8b7ef168f84d813090c96b59b84debb5af9b952e059d9bc79161a300de5ab7287328'
 
-ACCESS_TOKENS = ['8ce603bc9914dc70c98e64a7a0ba655288d994ec42397e51d0d0aff376f2ebefc223f1a1cdd775c3ce48c',
-                 'c4530d7da5bfd2f02385b2a52bdbb349b784f9816c630781c8005567aafad98d64ee65e1051e17454aa9c',
-                 'c8acb593349cb41ffcdf201ece0e1355890b9ba2b6218c2116247751e4b421baa55a6b0094db7a2bfde8e',
-                 '26095e58ba7019948a623667242b4b2bc1b91351d168c89d11027edc73b23303425c039c8d24b664014ab',
+ACCESS_TOKENS = ['62249173977aa7e1d560674e8125042b1b5b104c4b36f3bb63ae0ad8f9416edd658913035a9d8973eee24',
+                 '7ec3134c93b4cfcbfdcae3541ddf6bc4a7ebef308d6705c9d57c4bbe5aec03772b0902c20de5b80edc4ce',
+                 'beda384132dded646a4142cae446c9d4beb151fcec7208333d11a9bbee0c516f50de67973664e291aff55',
+                 'bd12a07d1af5671a07c6ea5459699eaec03dbe35a3e90a0d8996d6821afee7802fbac3208c5a9e2ee3cfc',
                  ]
 TOKEN_I = 0
 
@@ -38,6 +40,7 @@ _cache_db = None
 vk_API is a method for making request to VK API. return value us dictionary {'response': ...} or {'error': ...}
 example vk_API('users.get',{'user_ids':906554})
 """
+
 
 def api(method: str, params: dict, isjson=True, ispost=False, use_cache=False, cache_date_utc=None):
     global ACCESS_TOKENS
@@ -54,10 +57,9 @@ def api(method: str, params: dict, isjson=True, ispost=False, use_cache=False, c
         req_text = None
         status_code = 200
         if not ispost:
-            for k, v in params.items():
-                req_string += '&'+str(k)+'='+str(v)
-                if use_cache:
-                    cache_string += '&'+str(k)+'='+str(v)
+            req_string += '&' + req_string_from_dict(params)
+            if use_cache:
+                cache_string += '&' + req_string_from_dict(params)
             if use_cache:
                 req_text = query_from_cache_db(cache_string, 'wall_cache2', date_utc=cache_date_utc)
                 # req = cache.get(cache_string)      # trying to obtain data from cache
@@ -74,11 +76,9 @@ def api(method: str, params: dict, isjson=True, ispost=False, use_cache=False, c
                 req_text = req.text
         else:
             req_string = API_BASE+method+'?v='+API_VERSION+'&access_token='+ACCESS_TOKEN
-            req_dict = {}
-            for k, v in params.items():
-                req_dict[str(k)] = str(v)
-                if use_cache:
-                    cache_string += '&'+str(k)+'='+str(v)
+            req_dict = req_dict_from_dict(params)
+            if use_cache:
+                cache_string += '&' + req_string_from_dict(params)
             if use_cache:   # trying to obtain data from cache
                 req_text = query_from_cache_db(cache_string, 'wall_cache2', date_utc=cache_date_utc)
                 # req = cache.get(cache_string)
@@ -119,9 +119,58 @@ def api(method: str, params: dict, isjson=True, ispost=False, use_cache=False, c
     return req_text
 
 
+async def api_async(session, method: str, params: dict, result: list, token: str, isjson, ispost):
+    req_text = None
+    req_string = API_BASE + method + '?v=' + API_VERSION + '&access_token=' + token
+    status_code = 200
+    method = 'GET'
+    if ispost:
+        method = 'POST'
+
+    async with session.request(method, req_string, params=req_dict_from_dict(params)) as response:
+        status_code = response.status
+        req_text = await response.text()
+
+    if status_code != 200:
+        if isjson:
+            return {'error': {'error_code': -1, 'error_msg': ('Status code is ' + str(status_code))}}
+        else:
+            return "{'error':{'error_code':-1,'error_msg':'Status code is " + str(status_code) + "'}}"
+
+    if isjson and isinstance(req_text, str):
+        req_text = json.loads(req_text)
+    if not isjson and not isinstance(req_text, str):
+        req_text = json.dumps(req_text)
+
+    result.append(req_text)
+
+
+async def api_batch_async(method: str, params: list, tokens: list, result: list, isjson, ispost):
+    async with aiohttp.ClientSession() as session:
+        tasks = [asyncio.ensure_future(
+            api_async(session, method, params[i], result,
+                      tokens[i], isjson=isjson, ispost=ispost)) for i in range(len(params))]
+        await asyncio.gather(*tasks)
+
+def api_batch(method: str, params: list, isjson=True, ispost=False):
+    global ACCESS_TOKENS
+    if len(ACCESS_TOKENS) < len(params):
+        print('Error: too many requests in batch, should be ' + str(len(ACCESS_TOKENS)))
+    result = []
+    ioloop = asyncio.get_event_loop()
+    ioloop.run_until_complete(api_batch_async(method, params, ACCESS_TOKENS, result, isjson, ispost))
+    #ioloop.close()
+    return result
+
+
 def set_token(token: str):
     global ACCESS_TOKEN
     ACCESS_TOKEN = token
+
+
+def get_tokens():
+    global ACCESS_TOKENS
+    return ACCESS_TOKENS
 
 
 def set_version(version: str):
@@ -147,6 +196,25 @@ def error_code(response: dict):
     if is_error(response):
         return response['error']['error_code']
     return None
+
+
+def req_string_from_dict(params: dict):
+    req_string = ''
+    i = 0
+    for k, v in params.items():
+        if i:
+            req_string += '&' + str(k) + '=' + str(v)
+        else:
+            req_string += str(k) + '=' + str(v)
+        i += 1
+    return req_string
+
+
+def req_dict_from_dict(params: dict):
+    req_dict = {}
+    for k, v in params.items():
+        req_dict[str(k)] = str(v)
+    return req_dict
 
 
 def remove_from_cache(method: str, params: dict):
@@ -195,5 +263,14 @@ def remove_from_cache_db(query_string, collection_string):
 
 
 if __name__ == '__main__':
-    print(api('likes.getList',{'owner_id': 76428402, 'item_id': 1444, 'type': 'post', 'count': 1000}))
+    #print(api('likes.getList',{'owner_id': 76428402, 'item_id': 1444, 'type': 'post', 'count': 1000}))
     #print(api('users.get',{'user_ids':906554, 'fields':'first_name,last_name,counters,photo_100'}))
+    #print(api('users.get', {'user_ids': '2375126, 906554', 'fields': 'counters'}))
+
+    params = [{'user_ids': 906554}, {'user_ids': 2375126}, {'user_ids': 906554}, {'user_ids': 2375126}]
+    result = api_batch('users.get', params)
+    print(result)
+
+    params = [{'user_ids': 906554}, {'user_ids': 2375126}, {'user_ids': 906554}, {'user_ids': 2375126}]
+    result = api_batch('users.get', params)
+    print(result)
