@@ -1,3 +1,6 @@
+// Created by Gubanov Alexander (aka Derzhiarbuz) at 06.02.2020
+// Contacts: derzhiarbuz@gmail.com
+
 #ifndef _DADIFFUSIONSIMULATION_H_
 #define _DADIFFUSIONSIMULATION_H_
 
@@ -12,6 +15,10 @@ extern "C" {
 #include <stdlib.h>
 #include <malloc.h>
 
+typedef enum {Passive, NS, S, I} NodeState;
+
+typedef struct ICas ICase;
+
 typedef struct Nod Node;
 typedef Node* NodePtr;
 struct Nod {
@@ -20,18 +27,34 @@ struct Nod {
     int32_t actual_degree;
     int32_t nominal_degree;
     void* payload;
+    NodeState state;
 };
 
 NodePtr newNodePtr();
 void clearNodePtr(NodePtr ptr);
 int NodeCompare(const void *, const void *);
 
-
 typedef struct Netw Network;
 struct Netw {
     NodePtr *nodes;
     int32_t N;
+    ICase *cases;
+    int32_t N_cases;
+
+    NodePtr *nodes_to_check; //array of nodes that have infected neighbors
+    int32_t N_nodes_to_check;
 };
+
+struct ICas {
+    NodePtr node;
+    double time;
+    double value1;
+    double value2;
+};
+
+int ICaseCompare(const void *, const void *);
+int int32Compare(const void *c1, const void *c2);
+
 
 Network und_network;
 int32_t echo;
@@ -54,15 +77,18 @@ void DADSLog(char *text, ...);
 //**************************************************
 //utilities
 void DADSInitNetwork();
-void DADSCleatNetwork();
+void DADSClearNetwork();
 NodePtr DADSNodeForId(int32_t id);
+ICase DADSICaseForNodePtr(NodePtr node);
 //loading
 void DADSLoadNetworkFromFile(const char * fname);
-void DADSSetMetaForNode(int32_t node_id, int32_t nominal_degree, int32_t diactivated);
+void DADSSetMetaForNode(int32_t node_id, int32_t nominal_degree, int32_t deactivated);
 void DADSPurifyNetwork(); //removing disabled vertices, filling missed values with medians
 void DADSAddInfectionCase(int32_t node_id, double t);
 //model estimation
 void DADSPrepareForEstimation();
+void DADSRemarkNodes();
+double DADSConfirmDropForC(double c, double frac, double drop);
 double DADSLogLikelyhoodTKDR(double theta, double kappa, double delta, double rho);
 
 #ifdef  __cplusplus

@@ -26,7 +26,7 @@ def get_vk_users(user_ids, only_counters=False, batch_size=1000, async_load=Fals
     else:
         n_requests = 1
     if only_counters:
-        fields = 'counters'
+        fields = 'counters, last_seen'
     else:
         fields = VK_USER_META_FIELDS
     for uid in user_ids:

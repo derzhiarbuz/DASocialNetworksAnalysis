@@ -19,6 +19,14 @@ class CascadesManager(object):
         self.crawl_plan = []
         self._crawl_count = 0
 
+    def get_cascade_by_id(self, cas_id):
+        for cascade in self.cascades:
+            if cascade.post_meta['postinfo']['id'] == cas_id:
+                return cascade
+
+    def get_underlying_path(self):
+        return self.base_dir + self._name+'u_network.dos'
+
     def crawl_next(self):
         if len(self.crawl_plan):
             src = self.crawl_plan.pop(0)

@@ -630,7 +630,7 @@ class Simulator(object):
             if newinf_id in susceptible:
                 susceptible.remove(newinf_id)
             if echo:
-                print(str(time) + ' ' + str(loglikelyhood))
+                print(str(prev_time) + ' ' + str(loglikelyhood))
         return loglikelyhood
 
     @classmethod
@@ -772,7 +772,6 @@ class Simulator(object):
                 value[2] = theta*math.exp(decay*(value[0] - inf_time))
             dt = inf_time - prev_time
             prev_time = inf_time
-
 
             # calculating multipliers for no infection time
             for sus_id in susceptible:

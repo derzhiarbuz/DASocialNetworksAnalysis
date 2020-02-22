@@ -2,11 +2,11 @@
 # Contacts: derzhiarbuz@gmail.com
 
 import pandas as pd
-from da_diffusion_simulation import Simulator
-from da_network import Network
-import da_diffusion_estimation as de
+from Statistics.da_diffusion_simulation import Simulator
+from da_network import Network, NetworkOptimisation
+import Statistics.da_diffusion_estimation as de
 from matplotlib import pyplot
-import da_stat as stat
+import Statistics.da_stat as stat
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -33,7 +33,7 @@ import math
 # naz_corr.to_csv('D:/BigData/Galina_Kovarzh/naz_corr.csv')
 
 def make_test_network():
-    ntw = Network()
+    ntw = Network(optimisation=NetworkOptimisation.id_only)
     for i in range(31):
         ntw.add_node(i + 1)
     ntw.add_link(1, 2)
@@ -83,7 +83,7 @@ def make_test_network():
 
 
 def make_test_network_star():
-    ntw = Network()
+    ntw = Network(optimisation=NetworkOptimisation.id_only)
     for i in range(31):
         ntw.add_node(i+1)
     for i in range(30):
@@ -92,7 +92,7 @@ def make_test_network_star():
 
 
 def make_test_network_chain():
-    ntw = Network()
+    ntw = Network(optimisation=NetworkOptimisation.id_only)
     for i in range(31):
         ntw.add_node(i+1)
     for i in range(30):
@@ -101,7 +101,7 @@ def make_test_network_chain():
 
 
 def make_test_network_connected():
-    ntw = Network()
+    ntw = Network(optimisation=NetworkOptimisation.id_only)
     for i in range(31):
         ntw.add_node(i+1)
     for i in range(30):
@@ -417,7 +417,7 @@ def test_SI_relic(ntw: Network, true_theta: float, true_relic: float, continuous
         for dc in relics:
             if continuous:
                 pest = math.exp(Simulator.estimate_SI_relic_continuous(underlying=ntw, outcome=result['outcome'], theta=th,
-                                                              relic=dc, initials={1}, tmax=30))
+                                                              relic=dc, initials={1}, tmax=300))
             else:
                 pest = Simulator.estimate_SI_relic(underlying=ntw, outcome=result['outcome'], theta=th, relic=dc,
                                                    initials={1}, tmax=300, dt=dt)
@@ -461,4 +461,4 @@ if __name__ == '__main__':
     # print(Simulator.estimate_SI_recover(underlying=netwrk, outcome=result['outcome'], theta=0.05, recover_time=30,
     #                                      initials={1}, tmax=300, dt=1))
     # test_SI_relic(netwrk, 0.05, 0.05)
-    test_SI_confirm(netwrk, 0.1, 0.3, continuous=True)
+    test_SI_relic(netwrk, 0.05, 0.01, continuous=True)

@@ -12,6 +12,7 @@ import math
 from Statistics.da_diffusion_simulation import Simulator
 import numpy as np
 import matplotlib.pyplot as plt
+import Statistics.da_diffusion_estimation as est
 
 import da_socnetworks_crawler as crowler
 
@@ -59,7 +60,7 @@ import da_socnetworks_crawler as crowler
 # Navalny_live_-150565101_51320
 
 
-casman = CascadesManager(name='Zashitim_taigu_-164443025_8726_8021_6846', base_dir='D:/BigData/Charity/Cascades/')
+casman = CascadesManager(name='Komanda_Navalny_-140764628_8377_8554_8425', base_dir='D:/BigData/Charity/Cascades/')
 # casman.save_to_file()
 casman.load_from_file()
 # casman.schedule_crawl_posts_for_group(-150565101, 1, post_ids={51320})
@@ -84,17 +85,31 @@ casman.load_from_file()
 # cond_net.cascades_network.export_gexf('D:/BigData/Charity/Cascades/Komanda_Navalny_-140764628_8377_8554_8425.gexf', drop_singletones=False)
 #
 # i = 0
-casman.update_cascades(uselikes=False, usehiddens=False, logdyn=False, start_from_zero=False)
+# casman.update_cascades(uselikes=False, usehiddens=False, logdyn=False, start_from_zero=False)
 # casman.write_diffusion_speed_csv('D:/BigData/Charity/Cascades/Zashitim_taigu_-164443025_8726.csv',
 #                                  8726, derivative=True)
-for cascade in casman.cascades:
-    print(cascade.post_meta)
-    if cascade.post_meta['postinfo']['id'] == 8726:
 
-        #### estimating parameters #####
-        min_delay = cascade.get_minimum_delay()
-        outcome = cascade.get_outcome(normalization_factor=min_delay)
-        print('minimum delay: ' + str(min_delay))
+#loading counters
+###casman.underlying_net.counters_meta = {}
+casman.underlying_net.crawl_plan = []
+casman.underlying_net.schedule_load_counters_meta()
+casman.continue_crawling()
+casman.save_to_file()
+
+
+#8726: 1615.7052609591547   [1.13705951e-06 1.74581006e-03 3.25539755e-03 5.87984155e-09] //садим
+#8021: 1183.585359582195   [1.00457047e-06 3.01659167e-03 2.99908438e-03 5.07020291e-09] //уничтожают
+#6846: 4495.705121637081   [1.00019217e-12 3.61779381e-01 4.07895457e-06 1.24224204e-07]
+
+
+# for cascade in casman.cascades:
+#     print(cascade.post_meta)
+#     if cascade.post_meta['postinfo']['id'] == 8726:
+#
+#         #### estimating parameters #####
+#         min_delay = cascade.get_minimum_delay()
+#         outcome = cascade.get_outcome(normalization_factor=min_delay)
+#         print('minimum delay: ' + str(min_delay))
         # print(outcome)
         # print(sorted(outcome.values()))
         # print(len(casman.underlying_net.network.nodes))

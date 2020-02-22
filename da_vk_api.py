@@ -26,10 +26,10 @@ TOKEN_REQUEST5 = 'https://oauth.vk.com/authorize?client_id=7041064&display=page&
 
 ACCESS_TOKEN = '57a837765997b5bfc8b7ef168f84d813090c96b59b84debb5af9b952e059d9bc79161a300de5ab7287328'
 
-ACCESS_TOKENS = ['62249173977aa7e1d560674e8125042b1b5b104c4b36f3bb63ae0ad8f9416edd658913035a9d8973eee24',
-                 '7ec3134c93b4cfcbfdcae3541ddf6bc4a7ebef308d6705c9d57c4bbe5aec03772b0902c20de5b80edc4ce',
-                 'beda384132dded646a4142cae446c9d4beb151fcec7208333d11a9bbee0c516f50de67973664e291aff55',
-                 'bd12a07d1af5671a07c6ea5459699eaec03dbe35a3e90a0d8996d6821afee7802fbac3208c5a9e2ee3cfc',
+ACCESS_TOKENS = ['49935004206109612d2a796407497b34c346635c03e18a521426b323a41adebe393ed0c76f04122d1172e',
+                 'd6d18a8af38d2d4725daf82b827f0569cdc149d5aeebf6ec2bfd7a3376efb41e3813f2912cda0ee012954',
+                 'eaaa0ccc842355d8f078f016f2b2f93e916bea77a203aa35925884b66b24a8190cf541483345cdc4ae628',
+                 '8e2553f1fe43a35380eb8b630ac372aacdaf435dbeda8e818630fc4da067069fd4521e7aa15eb00e830c5',
                  ]
 TOKEN_I = 0
 

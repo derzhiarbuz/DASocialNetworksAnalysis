@@ -276,10 +276,13 @@ class ConnectionsNetworkManager(NetworkManager):
                     deactivated = 1
                 elif user['deactivated'] == 'banned':
                     deactivated = 2
-            self.counters_meta[uid] = (0, deactivated)
+            self.counters_meta[uid] = [0, deactivated]
             if user.get('counters'):
                 if user['counters'].get('friends'):
-                    self.counters_meta[uid] = (user['counters']['friends'], deactivated)
+                    self.counters_meta[uid] = [user['counters']['friends'], deactivated]
+            if user.get('last_seen'):
+                if user['last_seen'].get('time'):
+                    self.counters_meta[uid].append(user['last_seen']['time'])
 
     def add_vk_groups_degrees(self, groups):
         for group in groups:

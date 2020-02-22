@@ -18,6 +18,12 @@ class NetworkManager(object):
         self.source = NetworkSource.vkontakte
         self.crawl_plan = []
 
+    def get_dos_filepath(self):
+        if self.network.optimisation == NetworkOptimisation.id_only:
+            return self.base_dir + self.name + '_network.dos'
+        else:
+            return None
+
     def load_from_file(self):
         # print('Obtaining NetworkManager from file')
         other_data = DataManager.load(self.base_dir + self.name + '_data.pkl')
