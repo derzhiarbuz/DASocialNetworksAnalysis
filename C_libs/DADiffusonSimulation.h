@@ -28,6 +28,7 @@ struct Nod {
     int32_t nominal_degree;
     void* payload;
     NodeState state;
+    double theta;
 };
 
 NodePtr newNodePtr();
@@ -48,6 +49,7 @@ struct Netw {
 struct ICas {
     NodePtr node;
     double time;
+    int32_t index;
     double value1;
     double value2;
 };
@@ -58,6 +60,8 @@ int int32Compare(const void *c1, const void *c2);
 
 Network und_network;
 int32_t echo;
+double *dlldthetas;
+int32_t n_dlldthetas;
 
 
 int32_t hello_func(int32_t a);
@@ -88,8 +92,14 @@ void DADSAddInfectionCase(int32_t node_id, double t);
 //model estimation
 void DADSPrepareForEstimation();
 void DADSRemarkNodes();
+void DADSSetThetaForNode(int32_t node_id, double theta);
 double DADSConfirmDropForC(double c, double frac, double drop);
 double DADSLogLikelyhoodTKDR(double theta, double kappa, double delta, double rho);
+double DADSLogLikelyhoodKDR(double kappa, double delta, double rho);
+//derivatives
+double* DADSDLogLikelyhoodDtheta(double *thetas, double kappa, double delta, double rho);
+void DADSCalculateDerivatives(double theta, double kappa, double delta, double rho);
+double DADSDLogLikelyhoodDthetaForId(int32_t id);
 
 #ifdef  __cplusplus
 }

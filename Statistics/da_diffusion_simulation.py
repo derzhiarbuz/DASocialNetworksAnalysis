@@ -517,6 +517,7 @@ class Simulator(object):
             for node_id in susceptible:
                 neighbors = underlying.get_in_neighbors_for_node(node_id)
                 n_infected = len(neighbors & my_infected)
+                n_inf = len(my_infected)
                 p_not_infected = 1.0
                 if n_infected > 0:
                     p_not_infected = (1. - relic * dt) * (1. - theta * dt) ** n_infected
@@ -605,26 +606,27 @@ class Simulator(object):
         prev_time = .0
 
         for newinf_id, inf_time in my_outcome:
+           # print('PyNInfTot: ' + str(len(infected)))
             if inf_time == 0.0:
                 continue
             dt = inf_time - prev_time
             prev_time = inf_time
             neighbors = underlying.get_in_neighbors_for_node(newinf_id)
             n_infected = len(neighbors & infected)
-            loglikelyhood += math.log(n_infected * theta + relic)
+            loglikelyhood += math.log(n_infected * theta + len(infected) * relic)
             for sus_id in susceptible:
                 sus_neighbors = underlying.get_in_neighbors_for_node(sus_id)
                 sus_n_infected = len(sus_neighbors & infected)
                 if sus_n_infected > 0:
-                    loglikelyhood -= (sus_n_infected * theta + relic) * dt
+                    loglikelyhood -= (sus_n_infected * theta + len(infected) * relic) * dt
                 else:
-                    loglikelyhood -= relic * dt
+                    loglikelyhood -= len(infected) * relic * dt
             for nonleaf_id, n_leafs in leafs_dict.items():
                 if nonleaf_id in infected:
-                    loglikelyhood -= n_leafs * (theta + relic) * dt
+                    loglikelyhood -= n_leafs * (theta + len(infected) * relic) * dt
                 else:
-                    loglikelyhood -= n_leafs * relic * dt
-            loglikelyhood -= n_no_inf_neighbors * relic * dt
+                    loglikelyhood -= n_leafs * len(infected) * relic * dt
+            loglikelyhood -= n_no_inf_neighbors * len(infected) * relic * dt
 
             infected.add(newinf_id)
             if newinf_id in susceptible:
@@ -893,3 +895,65 @@ class Simulator(object):
                     immune_p=.0, initial_p=.0, tmax=1000.0, dt=.1):
         susceptible = set(underlying.nodes_ids)
 
+
+    @classmethod
+    def simulate_SI_decay_confirm_relicexp_hetero(cls, underlying: Network, theta: float,
+                                                  decay: float, confirm: float, relic: float, thetas: dict = None,
+                                                  infected: set = None, immunes: set = None, immune_p=.0,
+                                                  initial_p=.0, tmax=1000.0, dt=1):
+        susceptible = set(underlying.nodes_ids)
+        outcome_infected = {}
+        time = .0
+        probability = 1.
+        my_infected = infected.copy()
+
+        if my_infected is None:
+            my_infected = set()
+        if immunes is None:
+            immunes = set()
+        if len(my_infected) == 0 and initial_p > 0:
+            for node_id in susceptible:
+                if node_id not in immunes and random.uniform(0, 1.) < initial_p:
+                    my_infected.add(node_id)
+                    outcome_infected[node_id] = time
+        if len(immunes) == 0 and immune_p > 0:
+            for node_id in susceptible:
+                if node_id not in my_infected and random.uniform(0, 1.) < immune_p:
+                    immunes.add(node_id)
+        susceptible -= immunes | my_infected
+        while time < tmax:
+            time += dt
+            new_infected = set()
+            for node_id in susceptible:
+                neighbors = underlying.get_in_neighbors_for_node(node_id)
+                infected_nbrs = neighbors & my_infected
+                p_not_infected = 1.
+                relic_total = .0
+                for infected_id in my_infected:
+                    if outcome_infected.get(infected_id):
+                        relic_total += math.exp(-decay * (time - outcome_infected[infected_id]))
+                    else:
+                        relic_total += math.exp(-decay * time)
+                relic_total *= relic
+                if len(infected_nbrs) > 0:
+                    for neighbor_id in infected_nbrs:
+                        time_gone = outcome_infected.get(neighbor_id)
+                        if time_gone:
+                            time_gone = time - time_gone
+                        else:  # initialy infected
+                            time_gone = time
+                        if thetas and thetas.get(neighbor_id):
+                            p_not_infected *= (1. - thetas[neighbor_id] * dt * (math.exp(-time_gone * decay)))
+                        else:
+                            p_not_infected *= (1. - theta * dt * (math.exp(-time_gone * decay)))
+                p_not_infected *= (1. - relic_total * dt)
+                if random.uniform(0, 1.) < (1. - p_not_infected):
+                    new_infected.add(node_id)
+                    outcome_infected[node_id] = time
+                    probability *= 1. - p_not_infected
+                else:
+                    probability *= p_not_infected
+            my_infected |= new_infected
+            susceptible -= new_infected
+            # print(str(probability) + ' ' + str(infected))
+        return {'outcome': outcome_infected, 'p': probability}

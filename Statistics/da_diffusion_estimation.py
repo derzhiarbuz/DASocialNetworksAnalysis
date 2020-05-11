@@ -70,10 +70,10 @@ def llmax_for_diffusion(theta0, confirm0, decay0, relic0):
     res = minimize(loglikelyhood, x0, method='nelder-mead', options={'xtol': 1e-11, 'disp': True})
     return {'theta' : res.x[0], 'confirm' : res.x[1], 'decay' : res.x[2], 'relic' : res.x[3]}
 
-def llmax_for_diffusion_noconfirm(theta0, decay0, relic0):
-    dest = DiffusionEstimator.default(echo=True)
+def llmax_for_diffusion_noconfirm(theta0, decay0, relic0, disp=True):
+    dest = DiffusionEstimator.default(echo=disp)
     x0 = np.array([theta0, decay0, relic0])
-    res = minimize(loglikelyhood_noconfirm, x0, method='nelder-mead', options={'xtol': 1e-11, 'disp': True})
+    res = minimize(loglikelyhood_noconfirm, x0, method='nelder-mead', options={'xtol': 1e-11, 'disp': disp})
     return {'theta' : res.x[0], 'decay' : res.x[1], 'relic' : res.x[2]}
 
 def llmax_for_diffusion_SI_relic(theta0, relic0):
@@ -81,3 +81,9 @@ def llmax_for_diffusion_SI_relic(theta0, relic0):
     x0 = np.array([theta0, relic0])
     res = minimize(loglikelyhood_SI_relic, x0, method='nelder-mead', options={'xtol': 1e-11, 'disp': True})
     return {'theta' : res.x[0], 'relic' : res.x[1]}
+
+def dlldthetas_noconfirm(theta, decay, relic, ids):
+    dest = DiffusionEstimator.default(echo=True)
+    dll = dest.thetas_derivatives(theta, .0, decay, relic, ids)
+    #print(str(dll) + '   ' + str(x))
+    return dll

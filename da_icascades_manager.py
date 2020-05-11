@@ -7,6 +7,7 @@ import da_socnetworks_crawler as crlr
 import da_vk_api as vk
 from da_sna_data_manager import DataManager
 import datetime
+from time import sleep
 
 
 class CascadesManager(object):
@@ -40,10 +41,12 @@ class CascadesManager(object):
                 self.crawl_plan.insert(0, src)
                 return -1
         for cascade in self.cascades:
+            sleep(0.1)
             res = cascade.crawl_next()
             if res != 0:
                 return res
         if self.underlying_net:
+            sleep(0.1)
             return self.underlying_net.crawl_next()
         return 0
 

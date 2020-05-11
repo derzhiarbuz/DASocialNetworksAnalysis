@@ -94,6 +94,11 @@ class Network(object):
                 return node['attrs'].get(key)
         return None
 
+    def add_node_attribute(self, attr_id, attr_title, attr_type):
+        if self.nodes_attributes is None:
+            return
+        self.nodes_attributes.append({'id': attr_id, 'title': attr_title, 'type': attr_type})
+
     def add_link(self, node1_id, node2_id, mutual=True, weighted=False, weight=1,):
         self.add_node(node1_id)
         self.add_node(node2_id)
@@ -145,6 +150,11 @@ class Network(object):
             if link.get('attrs') is not None:
                 return link['attrs'].get(key)
         return None
+
+    def add_link_attribute(self, attr_id, attr_title, attr_type):
+        if self.links_attributes is None:
+            return
+        self.links_attributes.append({'id': attr_id, 'title': attr_title, 'type': attr_type})
 
     def export_gexf(self, path, drop_singletones = False, dynamic=False):
         if self.optimisation != NetworkOptimisation.none:

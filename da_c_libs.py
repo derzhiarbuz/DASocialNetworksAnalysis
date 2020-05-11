@@ -16,6 +16,9 @@ class DiffusionEstimator(object):
         self.libr.DADSAddInfectionCase.argtypes = [ctypes.c_int32, ctypes.c_double, ]
         self.libr.DADSLogLikelyhoodTKDR.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ]
         self.libr.DADSLogLikelyhoodTKDR.restype = ctypes.c_double
+        self.libr.DADSCalculateDerivatives.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ]
+        self.libr.DADSDLogLikelyhoodDthetaForId.argtypes = [ctypes.c_int32]
+        self.libr.DADSDLogLikelyhoodDthetaForId.restype = ctypes.c_double
         if echo:
             self.echo_on()
 
@@ -61,6 +64,13 @@ class DiffusionEstimator(object):
 
     def loglikelyhood(self, theta, confirm, decay, relic):
         return self.libr.DADSLogLikelyhoodTKDR(theta, confirm, decay, relic)
+
+    def thetas_derivatives(self, theta, confirm, decay, relic, ids):
+        self.libr.DADSCalculateDerivatives(theta, confirm, decay, relic)
+        derivatives = {}
+        for id in ids:
+            derivatives[id] = self.libr.DADSDLogLikelyhoodDthetaForId(id)
+        return derivatives
 
 
 

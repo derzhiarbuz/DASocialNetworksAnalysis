@@ -4,11 +4,13 @@
 import pandas as pd
 from Statistics.da_diffusion_simulation import Simulator
 from da_network import Network, NetworkOptimisation
+from da_network_manager import NetworkManager
 import Statistics.da_diffusion_estimation as de
 from matplotlib import pyplot
 import Statistics.da_stat as stat
 import numpy as np
 import matplotlib.pyplot as plt
+import Statistics.da_diffusion_estimation as est
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
@@ -452,6 +454,84 @@ def test_SI_relic(ntw: Network, true_theta: float, true_relic: float, continuous
     plt.show()
 
 
+def test_SI_relic_libtest(ntw: Network, true_theta: float, true_relic: float):
+    netman = NetworkManager(net=netwrk, name='temp', base_dir='D:/BigData/Charity/Cascades/')
+    netman.save_to_file()
+
+    result = Simulator.simulate_SI_decay_confirm_relicexp_hetero(underlying=netwrk, theta=true_theta, relic=true_relic,
+                                                                 confirm=.0, decay=.0, infected={1}, tmax=300,
+                                                                 dt=0.01)
+    result['outcome'][1] = .0
+    # result = Simulator.simulate_SI_relic(underlying=ntw, theta=true_theta, relic=true_relic,
+    #                             infected={1}, tmax=300, dt=0.01)
+    est.set_diffusion_data(netman.get_dos_filepath(), counters={}, outcome=result['outcome'])
+    est_th_py = .0
+    est_dc_py = .0
+    est_th_c = .0
+    est_dc_c = .0
+    best_pest_py = 0
+    best_pest_c = 0
+    ml_pval = 0
+    total_pest = 0
+    th = 0.0
+    thetas = np.arange(0.0001, 0.05, 0.0005)
+    relics = np.arange(0.0001, 0.01, 0.0001)
+    ps_py = np.zeros((len(thetas), len(relics)))
+    ps_c = np.zeros((len(thetas), len(relics)))
+    i = 0
+    # print(math.exp(
+    #     Simulator.estimate_SI_relic_continuous(underlying=ntw, outcome=result['outcome'], theta=true_theta,
+    #                                            relic=true_relic, initials={1}, tmax=300)))
+    # print(math.exp(-est.loglikelyhood_SI_relic([true_theta, true_relic])))
+    for th in thetas:
+        dc = 0.0
+        j = 0
+        for dc in relics:
+            pest_py = math.exp(
+                    Simulator.estimate_SI_relic_continuous(underlying=ntw, outcome=result['outcome'], theta=th,
+                                                           relic=dc, initials={1}, tmax=300))
+            pest_c = math.exp(-est.loglikelyhood_SI_relic([th, dc]))
+            #            print(str(th) + ' ' + str(pest))
+            if pest_py > best_pest_py:
+                best_pest_py = pest_py
+                est_th_py = th
+                est_dc_py = dc
+            if pest_c > best_pest_c:
+                best_pest_c = pest_c
+                est_th_c = th
+                est_dc_c = dc
+            ps_py[i][j] = pest_py
+            ps_c[i][j] = pest_c
+            j += 1
+        i += 1
+    print('True theta: ' + str(true_theta))
+    print('Max liklehood estimation Py: ' + str(est_th_py))
+    print('Max liklehood estimation C: ' + str(est_th_c))
+    print('True relic: ' + str(true_relic))
+    print('Max liklehood estimation Py: ' + str(est_dc_py))
+    print('Max liklehood estimation C: ' + str(est_dc_c))
+    print('Likelyhood Py: ' + str(best_pest_py))
+    print('Likelyhood C: ' + str(best_pest_c))
+
+    relics, thetas = np.meshgrid(relics, thetas)
+
+    plt.figure(figsize=(5, 5))
+    plt.xlabel('$\\theta$ (virulence)')
+    plt.ylabel('$\\rho$ (background)')
+    plt.contourf(thetas, relics, ps_py, levels=15)
+    plt.scatter([est_th_py], [est_dc_py], color='blue', marker='+')
+    plt.scatter([true_theta], [true_relic], color='red', marker='o')
+    plt.show()
+
+    plt.figure(figsize=(5, 5))
+    plt.xlabel('$\\theta$ (virulence)')
+    plt.ylabel('$\\rho$ (background)')
+    plt.contourf(thetas, relics, ps_c, levels=15)
+    plt.scatter([est_th_c], [est_dc_c], color='blue', marker='+')
+    plt.scatter([true_theta], [true_relic], color='red', marker='o')
+    plt.show()
+
+
 if __name__ == '__main__':
     netwrk = make_test_network()
     # netwrk.export_gexf('D:/Projects/Study/Papers please/Networks_MLE_Gubanov/ntwrk_connected.gexf')
@@ -461,4 +541,4 @@ if __name__ == '__main__':
     # print(Simulator.estimate_SI_recover(underlying=netwrk, outcome=result['outcome'], theta=0.05, recover_time=30,
     #                                      initials={1}, tmax=300, dt=1))
     # test_SI_relic(netwrk, 0.05, 0.05)
-    test_SI_relic(netwrk, 0.05, 0.01, continuous=True)
+    test_SI_relic_libtest(netwrk, 0.02, 0.001)

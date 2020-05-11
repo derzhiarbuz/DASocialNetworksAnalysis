@@ -58,13 +58,15 @@ import da_socnetworks_crawler as crowler
 # Zashitim_taigu_-164443025_8726_8021_6846
 # Komitet_Naziya_i_Svoboda_-17736722_26618
 # Navalny_live_-150565101_51320
+# Tomsk_v_zaschitu_-192308068_9
+# Tomsk_v_zaschitu_-192308068_all
 
 
-casman = CascadesManager(name='Komanda_Navalny_-140764628_8377_8554_8425', base_dir='D:/BigData/Charity/Cascades/')
+# casman = CascadesManager(name='Tomsk_v_zaschitu_-192308068_all', base_dir='D:/BigData/Charity/Cascades/')
 # casman.save_to_file()
-casman.load_from_file()
-# casman.schedule_crawl_posts_for_group(-150565101, 1, post_ids={51320})
-# # casman.schedule_crawl_posts_for_group(-145583685, 500)
+# casman.load_from_file()
+# casman.schedule_crawl_posts_for_group(-192308068, 1, post_ids={9})
+# casman.schedule_crawl_posts_for_group(-192308068, 500)
 # casman.continue_crawling()
 # casman.save_to_file()
 # # casman.load_from_file()
@@ -82,7 +84,7 @@ casman.load_from_file()
 # print(cond_net.cascades_network.links)
 # print(cond_net.cascades_network.nodes)
 # print(cond_net.cascades_network.nodes_attributes)
-# cond_net.cascades_network.export_gexf('D:/BigData/Charity/Cascades/Komanda_Navalny_-140764628_8377_8554_8425.gexf', drop_singletones=False)
+# cond_net.cascades_network.export_gexf('D:/BigData/Charity/Cascades/Tomsk_v_zaschitu_-192308068_9.gexf', drop_singletones=False)
 #
 # i = 0
 # casman.update_cascades(uselikes=False, usehiddens=False, logdyn=False, start_from_zero=False)
@@ -91,10 +93,10 @@ casman.load_from_file()
 
 #loading counters
 ###casman.underlying_net.counters_meta = {}
-casman.underlying_net.crawl_plan = []
-casman.underlying_net.schedule_load_counters_meta()
-casman.continue_crawling()
-casman.save_to_file()
+# casman.underlying_net.crawl_plan = []
+# casman.underlying_net.schedule_load_counters_meta()
+# casman.continue_crawling()
+# casman.save_to_file()
 
 
 #8726: 1615.7052609591547   [1.13705951e-06 1.74581006e-03 3.25539755e-03 5.87984155e-09] //садим
@@ -250,3 +252,9 @@ casman.save_to_file()
 #         i = 1
 #         t = (time // dt) * dt
 # f.close()
+
+plt.subplot(1, 2, 1)
+plt.bar(x=[-1, 0, 1], height=[0, 0, 5])
+plt.subplot(1, 2, 2)
+plt.bar(x=[-1, 0, 1], height=[100, 0, 105])
+plt.show()
