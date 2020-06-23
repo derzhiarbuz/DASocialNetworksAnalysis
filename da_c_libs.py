@@ -13,10 +13,24 @@ class DiffusionEstimator(object):
         self.libr = ctypes.cdll.LoadLibrary('D:/Projects/Study/DASocialNetworksAnalysis/C_libs/DADiffusionSimulation.dll')
         self.libr.DADSLoadNetworkFromFile.argtypes = [ctypes.POINTER(ctypes.c_char), ]
         self.libr.DADSSetMetaForNode.argtypes = [ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ]
+        self.libr.DADSSetNumberOfInfections.argtypes = [ctypes.c_int32]
+        self.libr.DADSAddInfectionCaseForInfection.argtypes = [ctypes.c_int32, ctypes.c_double, ctypes.c_int32, ]
         self.libr.DADSAddInfectionCase.argtypes = [ctypes.c_int32, ctypes.c_double, ]
-        self.libr.DADSLogLikelyhoodTKDR.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ]
+        self.libr.DADSLogLikelyhoodTKDR.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                                                    ctypes.c_double, ctypes.c_double, ]
         self.libr.DADSLogLikelyhoodTKDR.restype = ctypes.c_double
-        self.libr.DADSCalculateDerivatives.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ]
+        self.libr.DADSLogLikelyhoodKDR.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ]
+        self.libr.DADSLogLikelyhoodKDR.restype = ctypes.c_double
+        self.libr.DADSLogLikelyhoodByNodeTheta.argtypes = [ctypes.c_double, ctypes.c_int32, ctypes.c_double,
+                                                           ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                                                           ctypes.c_double, ]
+        self.libr.DADSLogLikelyhoodByNodeTheta.restype = ctypes.c_double
+        self.libr.DADSLogLikelyhoodTKDRByInfectionsEnsemble.argtypes = [ctypes.c_double, ctypes.c_double,
+                                                                        ctypes.c_double, ctypes.c_double,
+                                                                        ctypes.c_double, ]
+        self.libr.DADSLogLikelyhoodTKDRByInfectionsEnsemble.restype = ctypes.c_double
+        self.libr.DADSCalculateDerivatives.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                                                       ctypes.c_double, ctypes.c_double, ]
         self.libr.DADSDLogLikelyhoodDthetaForId.argtypes = [ctypes.c_int32]
         self.libr.DADSDLogLikelyhoodDthetaForId.restype = ctypes.c_double
         if echo:
@@ -51,10 +65,17 @@ class DiffusionEstimator(object):
         for key, value in outcome.items():
             self.libr.DADSAddInfectionCase(key, value)
 
+    def add_outcomes(self, outcomes: list):
+        self.libr.DADSSetNumberOfInfections(len(outcomes))
+        for i in range(len(outcomes)):
+            outcome = outcomes[i]
+            for key, value in outcome.items():
+                self.libr.DADSAddInfectionCaseForInfection(key, value, i)
+
     def prepare_for_estimation(self):
         self.libr.DADSPrepareForEstimation()
 
-    def load_netwotk(self, fname: str, counters: dict, outcome: dict):
+    def load_network(self, fname: str, counters: dict, outcome: dict):
         self.load_network_from_file(fname)
         if counters:
             self.set_counters(counters)
@@ -62,11 +83,26 @@ class DiffusionEstimator(object):
         self.add_outcome(outcome)
         self.prepare_for_estimation()
 
-    def loglikelyhood(self, theta, confirm, decay, relic):
-        return self.libr.DADSLogLikelyhoodTKDR(theta, confirm, decay, relic)
+    def load_network_inf_ensemble(self, fname: str, counters: dict, outcomes: list):
+        self.load_network_from_file(fname)
+        if counters:
+            self.set_counters(counters)
+        self.purify_network()
+        self.add_outcomes(outcomes)
+        self.prepare_for_estimation()
 
-    def thetas_derivatives(self, theta, confirm, decay, relic, ids):
-        self.libr.DADSCalculateDerivatives(theta, confirm, decay, relic)
+    def loglikelyhood(self, theta, confirm, decay, relic, observe_time=-1):
+        return self.libr.DADSLogLikelyhoodTKDR(theta, confirm, decay, relic, observe_time)
+
+    def loglikelyhood_ensemble(self, theta, confirm, decay, relic, observe_time=-1):
+        return self.libr.DADSLogLikelyhoodTKDRByInfectionsEnsemble(theta, confirm, decay, relic, observe_time)
+
+    def loglikelyhood_by_node_theta(self, node_theta, node_id, theta, confirm, decay, relic, observe_time=-1):
+        return self.libr.DADSLogLikelyhoodByNodeTheta(node_theta, node_id, theta, confirm, decay, relic
+                                                      , observe_time)
+
+    def thetas_derivatives(self, theta, confirm, decay, relic, ids, observe_time):
+        self.libr.DADSCalculateDerivatives(theta, confirm, decay, relic, observe_time)
         derivatives = {}
         for id in ids:
             derivatives[id] = self.libr.DADSDLogLikelyhoodDthetaForId(id)

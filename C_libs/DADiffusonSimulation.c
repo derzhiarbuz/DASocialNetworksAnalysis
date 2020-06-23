@@ -83,6 +83,8 @@ void DADSInitNetwork() {
         und_network.N_cases = 0;
         und_network.nodes_to_check = NULL;
         und_network.N_nodes_to_check = 0;
+        und_network.infections = NULL;
+        und_network.N_infections = 0;
     }
 }
 
@@ -98,7 +100,15 @@ void DADSClearNetwork() {
         }
         free(und_network.nodes);
     }
-    if(und_network.cases) free(und_network.cases);
+    if(und_network.infections) {
+        for(int32_t i=0; i<und_network.N_infections; i++) {
+            if(und_network.infections[i].cases)
+                free(und_network.infections[i].cases);
+        }
+        free(und_network.infections);
+    }
+    else
+        if(und_network.cases) free(und_network.cases);
     if(und_network.nodes_to_check) free(und_network.nodes_to_check);
     und_network.nodes = NULL;
     und_network.N = 0;
@@ -106,6 +116,8 @@ void DADSClearNetwork() {
     und_network.N_cases = 0;
     und_network.nodes_to_check = NULL;
     und_network.N_nodes_to_check = 0;
+    und_network.infections = NULL;
+    und_network.N_infections = 0;
 }
 
 
@@ -308,7 +320,45 @@ void DADSPurifyNetwork() {
 }
 
 
+void DADSSetNumberOfInfections(int32_t n) {
+    if(und_network.infections) {
+        for(int32_t i=0; i<und_network.N_infections; i++) {
+            if(und_network.infections[i].cases)
+                free(und_network.infections[i].cases);
+        }
+        free(und_network.infections);
+    }
+    und_network.infections = malloc(n * sizeof(Infection));
+    und_network.N_infections = n;
+    for(int32_t i=0; i<und_network.N_infections; i++) {
+        und_network.infections[i].cases = NULL;
+        und_network.infections[i].N_cases = 0;
+        und_network.infections[i].id = 0;
+    }
+}
+
+
+void DADSAddInfectionCaseForInfection(int32_t node_id, double t, int32_t infection_number) {
+    if(infection_number >= und_network.N_infections) return;
+    //DADSLog("\nInfection number: %d", infection_number);
+    //DADSLog("  case id: %d", node_id);
+    //DADSLog("  time: %f", t);
+    und_network.cases = und_network.infections[infection_number].cases;
+    und_network.N_cases = und_network.infections[infection_number].N_cases;
+    DADSAddInfectionCaseCurrent(node_id, t);
+    und_network.infections[infection_number].cases = und_network.cases;
+    und_network.infections[infection_number].N_cases = und_network.N_cases;
+}
+
+
 void DADSAddInfectionCase(int32_t node_id, double t) {
+    if(!und_network.infections)
+        DADSSetNumberOfInfections(1);
+    DADSAddInfectionCaseForInfection(node_id, t, 0);
+}
+
+
+void DADSAddInfectionCaseCurrent(int32_t node_id, double t) {
     NodePtr node = DADSNodeForId(node_id);
     ICase *temp;
     int32_t i;
@@ -337,7 +387,7 @@ void DADSAddInfectionCase(int32_t node_id, double t) {
 
 
 void DADSPrepareForEstimation() { //making some stuff to simplify estimation process
-    int32_t i, j;
+    int32_t i, j, ii;
     NodePtr node;
     NodeState st;
 
@@ -351,9 +401,12 @@ void DADSPrepareForEstimation() { //making some stuff to simplify estimation pro
         return;
     }
 
-    qsort(und_network.cases, und_network.N_cases, sizeof(ICase), ICaseCompare);
-    for(i=0; i<und_network.N_cases; i++)
-        und_network.cases[i].index = i;
+    for(ii=0; ii<und_network.N_infections; ii++) {
+        qsort(und_network.infections[ii].cases, und_network.infections[ii].N_cases, sizeof(ICase), ICaseCompare);
+        for(i=0; i<und_network.infections[ii].N_cases; i++)
+            und_network.infections[ii].cases[i].index = i;
+    }
+
 /*    for(i=0; i<und_network.N_cases; i++) {
         DADSLog("\n%d : ", und_network.cases[i].node->id);
         DADSLog("%f", und_network.cases[i].time);
@@ -363,14 +416,16 @@ void DADSPrepareForEstimation() { //making some stuff to simplify estimation pro
     und_network.N_nodes_to_check = 0;
 
     DADSLog("\nDefining nodes that are in contact with infected.");
-    for(i=0; i<und_network.N_cases; i++) {
-        node = und_network.cases[i].node;
-        node->payload = &und_network.cases[i];
-        if(node->state == Passive) und_network.N_nodes_to_check++;
-        node->state = NS;
-        for(j=0; j<node->actual_degree; j++) {
-            if(node->neigbors[j]->state == Passive) und_network.N_nodes_to_check++;
-            node->neigbors[j]->state = NS;
+    for(ii=0; ii<und_network.N_infections; ii++) {
+        for(i=0; i<und_network.infections[ii].N_cases; i++) {
+            node = und_network.infections[ii].cases[i].node;
+            //node->payload = &und_network.infections[ii].cases[i];
+            if(node->state == Passive) und_network.N_nodes_to_check++;
+            node->state = NS;
+            for(j=0; j<node->actual_degree; j++) {
+                if(node->neigbors[j]->state == Passive) und_network.N_nodes_to_check++;
+                node->neigbors[j]->state = NS;
+            }
         }
     }
 
@@ -403,28 +458,43 @@ void DADSRemarkNodes() {
     NodePtr node;
     NodeState st;
 
+    und_network.N_active_nodes = 0; //counting nodes that are not passive for current case
+
     for(i=0; i<und_network.N_nodes_to_check; i++) {
         und_network.nodes_to_check[i]->state = Passive;
     }
 
     for(i=0; i<und_network.N_cases; i++) {
         node = und_network.cases[i].node;
+        node->payload = &und_network.cases[i];
         //DADSLog("\nCase id: %d", und_network.cases[i].node->id);
         //DADSLog("\nCase time: %f", und_network.cases[i].time);
         if(und_network.cases[i].time == 0) {
             st = S;
             node->state = I;
+            und_network.N_active_nodes++;
             //DADSLog("\nInfected Id: %d", node->id);
         }
         else {
             st = NS;
-            if(node->state == Passive)
+            if(node->state == Passive) {
                 node->state = NS;
+                und_network.N_active_nodes++;
+            }
         }
         for(j=0; j<node->actual_degree; j++) {
-            if(node->neigbors[j]->state < st)
+            if(node->neigbors[j]->state < st) {
+                if(node->neigbors[j]->state == Passive) und_network.N_active_nodes++;
                 node->neigbors[j]->state = st;
+            }
         }
+    }
+}
+
+
+void DADSSetThetaForAllNodes(double theta) {
+    for(int32_t i=0; i<und_network.N_cases; i++) {
+        und_network.cases[i].node->theta = theta;
     }
 }
 
@@ -446,25 +516,36 @@ int DADSHasConfirmDrop(double c, double frac) {
 }
 
 
-double DADSLogLikelyhoodTKDR(double theta, double confirm, double decay, double relic) {
-    int32_t i;
-    for(i=0; i<und_network.N_cases; i++) {
-        und_network.cases[i].node->theta = theta;
-    }
-    return DADSLogLikelyhoodKDR(confirm, decay, relic);
+double DADSLogLikelyhoodTKDR(double theta, double confirm, double decay, double relic, double observe_time) {
+    DADSSetThetaForAllNodes(theta);
+    return DADSLogLikelyhoodKDR(confirm, decay, relic, observe_time);
 }
 
 
-double DADSLogLikelyhoodKDR(double confirm, double decay, double relic) {
+double DADSLogLikelyhoodByNodeTheta(double node_theta, int32_t node_id, double theta, double confirm, double decay, double relic, double observe_time) {
+    DADSSetThetaForAllNodes(theta);
+    DADSSetThetaForNode(node_id, node_theta);
+    return DADSLogLikelyhoodKDR(confirm, decay, relic, observe_time);
+}
+
+
+double DADSLogLikelyhoodKDR(double confirm, double decay, double relic, double observe_time) {
     int32_t i, j, k, n_i;
-    double t = .0, dt, loglikelyhood, inf_rate, cd, relic1, relic2;
+    double t = .0, dt, new_time, loglikelyhood, inf_rate, cd, relic1, relic2;
     double confirm_drop = 0.1;
     ICase cur_case, *neigh_case;
     NodePtr neighbor, cur_node;
+    int observation_tail = 0;
 
     DADSRemarkNodes(); //dropping all I, S and NS states to initial (t=0)
+    //DADSLog("\nOT: %f", observe_time);
 
-/*    for(i=0; i<und_network.N; i++) {
+    if(observe_time<1) {
+        //if no observation time, set it to the last case time
+        observe_time = und_network.cases[und_network.N_cases-1].time;
+    }
+
+    /*for(i=0; i<und_network.N; i++) {
         DADSLog("\n%d : ", und_network.nodes[i]->id);
         DADSLog(" %d", und_network.nodes[i]->state);
     }*/
@@ -474,29 +555,37 @@ double DADSLogLikelyhoodKDR(double confirm, double decay, double relic) {
         if(und_network.cases[i].time > 0.) break;
     }
 
-    for(;i<und_network.N_cases; i++) {
-        cur_case = und_network.cases[i];
+    for(;i<und_network.N_cases + 1; i++) { //the last step is for observation finish time
+        if(i < und_network.N_cases) //if it's a case, not the end of observation
+            new_time = und_network.cases[i].time;
+        else
+            new_time = observe_time;
         relic1 = .0;
         relic2 = .0;
-        for(j=0; j<=i; j++) {
+        for(j=0; j<i; j++) {
             if(decay > .0) {
-                und_network.cases[j].value1 = 1./decay*(exp(decay*(und_network.cases[j].time - t)) - exp(decay*(und_network.cases[j].time - cur_case.time)));
+                und_network.cases[j].value1 = 1./decay*(exp(decay*(und_network.cases[j].time - t)) - exp(decay*(und_network.cases[j].time - new_time)));
+                //und_network.cases[j].value1 = 1./(1.-decay)*(pow((new_time - und_network.cases[j].time), 1.-decay) - pow((t - und_network.cases[j].time), 1. - decay));
                 relic1 += relic*(und_network.cases[j].value1);
                 und_network.cases[j].value1 *= und_network.cases[j].node->theta;
-                und_network.cases[j].value2 = 1.*exp(decay*(und_network.cases[j].time - cur_case.time));
+                und_network.cases[j].value2 = 1.*exp(decay*(und_network.cases[j].time - new_time));
+                //und_network.cases[j].value2 = 1.*pow((new_time - und_network.cases[j].time), -decay);
                 relic2 += relic*(und_network.cases[j].value2);
                 und_network.cases[j].value2 *= und_network.cases[j].node->theta;
             }
             else {
-                und_network.cases[j].value1 = und_network.cases[j].node->theta*(cur_case.time - t);
-                relic1 += relic*(cur_case.time - t);
+                und_network.cases[j].value1 = und_network.cases[j].node->theta*(new_time - t);
+                relic1 += relic*(new_time - t);
                 und_network.cases[j].value2 = und_network.cases[j].node->theta;
                 relic2 += relic*1;
             }
         }
-        dt = cur_case.time - t;
-        t = cur_case.time;
+        dt = new_time - t;
+        t = new_time;
+        //DADSLog("\n%f ", t);
         //the member of ll function defined by non-infection during current time interval
+        double prevll = 0;
+        int nrel = 0;
         for(j=0; j<und_network.N_nodes_to_check; j++) {
             cur_node = und_network.nodes_to_check[j];
             if(cur_node->state == S) { //if node is susceptible
@@ -519,6 +608,10 @@ double DADSLogLikelyhoodKDR(double confirm, double decay, double relic) {
                 //loglikelyhood -= (inf_rate + relic);
                 //loglikelyhood -= (inf_rate + relic*i);
                 loglikelyhood -= (inf_rate + relic1);
+                //nrel++;
+                //prevll -= (inf_rate + relic1);
+                //DADSLog(" %d ", cur_node->id);
+                //DADSLog(" %f ", relic1);
             }
             else if(cur_node->state == NS) {
                 //loglikelyhood -= confirm_drop*relic*dt;
@@ -526,64 +619,104 @@ double DADSLogLikelyhoodKDR(double confirm, double decay, double relic) {
                 //loglikelyhood -= relic;
                 //loglikelyhood -= relic*i;
                 loglikelyhood -= relic1;
+                //nrel++;
+                //prevll -= relic1;
             }
         }
         //loglikelyhood -= confirm_drop*relic*dt*(und_network.N - und_network.N_nodes_to_check);
         //loglikelyhood -= relic*dt*(und_network.N - und_network.N_nodes_to_check);
         //loglikelyhood -= relic*(und_network.N - und_network.N_nodes_to_check);
         //loglikelyhood -= relic*i*(und_network.N - und_network.N_nodes_to_check);
-        loglikelyhood -= relic1*(und_network.N - und_network.N_nodes_to_check);
-
-        cur_node = cur_case.node;
-        n_i = 0;
-        inf_rate = .0;
-        //the member of ll function defined by infection at the end of current time interval
-        for(k=0; k<cur_node->actual_degree; k++) {
-            neighbor = cur_node->neigbors[k];
-            if(neighbor->state == I) { //neighbor is infected
-                n_i++;
-                neigh_case = (ICase *)neighbor->payload; //case for this neighbor
-                inf_rate += neigh_case->value2;
-            }
-            else if(neighbor->state == NS) //if neighbor was not susceptible, now it is
-                neighbor->state = S;
-        }
-        if(DADSHasConfirmDrop(confirm, (double)n_i/cur_node->nominal_degree))
-            cd = confirm_drop;
-        else
-            cd = 1.;
-        //loglikelyhood += log(cd*inf_rate + relic);
-        //loglikelyhood += log(inf_rate + relic);
-        //loglikelyhood += log(inf_rate + relic/dt);
-        //loglikelyhood += log(inf_rate + relic*i);
-        loglikelyhood += log(inf_rate + relic2);
-
-        //int kk = 0;
-        //for(int pp=0; pp<und_network.N; pp++) {
-        //    if(und_network.nodes[pp]->state == I) kk++;
-        //}
-        //DADSLog("\nCNInfTot %d", kk);
-        cur_node->state = I; //the node is infected now
-        //DADSLog("\n%f ", t);
+        loglikelyhood -= relic1*(und_network.N - und_network.N_active_nodes);
+        //nrel+=und_network.N - und_network.N_active_nodes;
+        //prevll -= relic1*(und_network.N - und_network.N_active_nodes);
         //DADSLog(" %f ", loglikelyhood);
+        if(i < und_network.N_cases) { //if it's a case, not the end of observation
+            cur_case = und_network.cases[i];
+            cur_node = cur_case.node;
+            n_i = 0;
+            inf_rate = .0;
+            //the member of ll function defined by infection at the end of current time interval
+            for(k=0; k<cur_node->actual_degree; k++) {
+                neighbor = cur_node->neigbors[k];
+                if(neighbor->state == I) { //neighbor is infected
+                    n_i++;
+                    neigh_case = (ICase *)neighbor->payload; //case for this neighbor
+                    inf_rate += neigh_case->value2;
+                }
+                else if(neighbor->state == NS) //if neighbor was not susceptible, now it is
+                    neighbor->state = S;
+            }
+            if(DADSHasConfirmDrop(confirm, (double)n_i/cur_node->nominal_degree))
+                cd = confirm_drop;
+            else
+                cd = 1.;
+            //loglikelyhood += log(cd*inf_rate + relic);
+            //loglikelyhood += log(inf_rate + relic);
+            //loglikelyhood += log(inf_rate + relic/dt);
+            //loglikelyhood += log(inf_rate + relic*i);
+            loglikelyhood += log(inf_rate + relic2);
+
+            //int kk = 0;
+            //for(int pp=0; pp<und_network.N; pp++) {
+            //    if(und_network.nodes[pp]->state == I) kk++;
+            //}
+            //DADSLog("\nCNInfTot %d", kk);
+            cur_node->state = I; //the node is infected now
+            //DADSLog("\n%d ", cur_node->id);
+            //DADSLog(" %f ", t);
+            //DADSLog(" %f ", prevll);
+            //DADSLog(" %f ", log(inf_rate + relic2));
+            //DADSLog(" %f ", loglikelyhood);
+            //DADSLog(" nr%d ", nrel);
+        }
+        else {
+            //DADSLog("\ntail %f ", t);
+            //DADSLog(" %f ", prevll);
+            //DADSLog(" nr%d ", nrel);
+            //DADSLog(" r%f ", relic1);
+        }
     }
 /*    DADSLog("\ntheta: %f", theta);
     DADSLog("\nconfirm: %f", confirm);
     DADSLog("\ndecay: %f", decay);
     DADSLog("\nrelic: %f", relic);
     DADSLog("\nLL: %f", loglikelyhood);*/
+    //DADSLog("\n%f", t);
     return loglikelyhood;
 }
 
+
+double DADSLogLikelyhoodTKDRByInfectionsEnsemble(double theta, double kappa, double delta, double rho, double observe_time) {
+    double loglikelyhood = .0;
+    double newll = .0;
+    //DADSLog("\nEnsemble!");
+    for(int32_t i=0; i<und_network.N_infections; i++) {
+        und_network.cases = und_network.infections[i].cases;
+        und_network.N_cases = und_network.infections[i].N_cases;
+        newll = DADSLogLikelyhoodTKDR(theta, kappa, delta, rho, observe_time);
+        loglikelyhood += newll;
+        //DADSLog("\n%f", newll);
+        //DADSLog("\n");
+    }
+    return loglikelyhood;
+}
+
+
 //derivatives
-double* DADSDLogLikelyhoodDtheta(double *thetas, double confirm, double decay, double relic) {
+double* DADSDLogLikelyhoodDtheta(double *thetas, double confirm, double decay, double relic, double observe_time) {
     int32_t i, j, k, n_i;
-    double t = .0, dt, *dfdthetas, inf_rate, cd, L;
+    double t = .0, dt, *dfdthetas, inf_rate, cd, L, new_time;
     double confirm_drop = 0.1;
     ICase cur_case, *neigh_case;
     NodePtr neighbor, cur_node;
 
     DADSRemarkNodes(); //dropping all I, S and NS states to initial (t=0)
+
+    if(observe_time<1) {
+        //if no observation time, set it to the last case time
+        observe_time = und_network.cases[und_network.N_cases-1].time;
+    }
 
     dfdthetas = malloc(und_network.N_cases * sizeof(double)); //partial derivatives array
     for(i=0; i<und_network.N_cases; i++) dfdthetas[i] = .0;
@@ -594,6 +727,144 @@ double* DADSDLogLikelyhoodDtheta(double *thetas, double confirm, double decay, d
     }*/
 
     for(i=0; i<und_network.N_cases; i++) {
+        if(und_network.cases[i].time > 0.) break;
+    }
+
+    for(;i<und_network.N_cases + 1; i++) { //the last step is for observation finish time
+        if(i < und_network.N_cases) //if it's a case, not the end of observation
+            new_time = und_network.cases[i].time;
+        else
+            new_time = observe_time;
+
+        for(j=0; j<=i; j++) {
+            if(decay > .0) {
+                und_network.cases[j].value1 = 1./decay*(exp(decay*(und_network.cases[j].time - t)) - exp(decay*(und_network.cases[j].time - new_time)));
+                und_network.cases[j].value2 = 1.*exp(decay*(und_network.cases[j].time - new_time));
+            }
+            else {
+                und_network.cases[j].value1 = 1.*(new_time - t);
+                und_network.cases[j].value2 = 1.;
+            }
+        }
+        dt = new_time - t;
+        t = new_time;
+
+        //the member of ll function defined by non-infection during current time interval
+        for(j=0; j<und_network.N_nodes_to_check; j++) {
+            cur_node = und_network.nodes_to_check[j];
+            if(cur_node->state == S) { //if node is susceptible
+                n_i = 0;
+                inf_rate = .0;
+                for(k=0; k<cur_node->actual_degree; k++) {
+                    neighbor = cur_node->neigbors[k];
+                    if(neighbor->state == I) { //neighbor is infected
+                        n_i++;
+                        neigh_case = (ICase *)neighbor->payload; //case for this neighbor
+                        dfdthetas[neigh_case->index] -= neigh_case->value1;
+                    }
+                }
+            }
+        }
+
+        if(i < und_network.N_cases) { //if it's a case, not the end of observation
+            cur_case = und_network.cases[i];
+            cur_node = cur_case.node;
+            n_i = 0;
+            inf_rate = .0;
+            L = .0;
+            //making common L function denominator
+            for(j=0; j<=i; j++) {
+                L += relic*und_network.cases[j].value2; //exponential decaying relic
+            }
+            for(k=0; k<cur_node->actual_degree; k++) {
+                neighbor = cur_node->neigbors[k];
+                if(neighbor->state == I) { //neighbor is infected
+                    neigh_case = (ICase *)neighbor->payload; //case for this neighbor
+                    L += thetas[neigh_case->index] * neigh_case->value2;
+                }
+            }
+            //the member of ll function defined by infection at the end of current time interval
+            for(k=0; k<cur_node->actual_degree; k++) {
+                neighbor = cur_node->neigbors[k];
+                if(neighbor->state == I) { //neighbor is infected
+                    n_i++;
+                    neigh_case = (ICase *)neighbor->payload; //case for this neighbor
+                    dfdthetas[neigh_case->index] += neigh_case->value2/L;
+                }
+                else if(neighbor->state == NS) //if neighbor was not susceptible, now it is
+                    neighbor->state = S;
+            }
+            cur_node->state = I; //the node is infected now
+        }
+        //DADSLog("\n%f ", t);
+        //DADSLog(" %f ", loglikelyhood);
+    }
+/*    DADSLog("\ntheta: %f", theta);
+    DADSLog("\nconfirm: %f", confirm);
+    DADSLog("\ndecay: %f", decay);
+    DADSLog("\nrelic: %f", relic);
+    DADSLog("\nLL: %f", loglikelyhood);*/
+    return dfdthetas;
+}
+
+void DADSCalculateDerivatives(double theta, double confirm, double decay, double relic, double observe_time) {
+    static int first_time = 1;
+    double *thetas;
+
+    if(first_time) {
+        dlldthetas = NULL;
+        n_dlldthetas = 0;
+        first_time = 0;
+    }
+
+    if(dlldthetas) {
+        free(dlldthetas);
+        n_dlldthetas = 0;
+    }
+    if(!und_network.N_cases) return;
+    thetas = malloc(und_network.N_cases * sizeof(double));
+    n_dlldthetas = und_network.N_cases;
+    for(int i=0; i<und_network.N_cases; i++) {
+        thetas[i] = theta;
+    }
+    dlldthetas = DADSDLogLikelyhoodDtheta(thetas, confirm, decay, relic, observe_time);
+
+    free(thetas);
+}
+
+double DADSDLogLikelyhoodDthetaForId(int32_t id) {
+    if(!n_dlldthetas || n_dlldthetas != und_network.N_cases) return .0;
+    for(int i=0; i<n_dlldthetas; i++) {
+        if(und_network.cases[i].node->id == id) {
+                return dlldthetas[i];
+        }
+    }
+    return .0;
+}
+
+//gradient for four params
+/*double DADSLogLikelyhoodTDRGradient() {
+    ll_derivatives.dfdtheta = .0;
+    ll_derivatives.dfddelta = .0;
+    ll_derivatives.dfdrho = .0;
+
+    int32_t i, j, k, n_i;
+    double t = .0, dt, *dfdthetas, inf_rate, cd, L;
+    double confirm_drop = 0.1;
+    ICase cur_case, *neigh_case;
+    NodePtr neighbor, cur_node;
+
+    DADSRemarkNodes(); //dropping all I, S and NS states to initial (t=0)
+
+    dfdthetas = malloc(und_network.N_cases * sizeof(double)); //partial derivatives array
+    for(i=0; i<und_network.N_cases; i++) dfdthetas[i] = .0;*/
+
+/*    for(i=0; i<und_network.N; i++) {
+        DADSLog("\n%d : ", und_network.nodes[i]->id);
+        DADSLog(" %d", und_network.nodes[i]->state);
+    }*/
+
+ /*   for(i=0; i<und_network.N_cases; i++) {
         if(und_network.cases[i].time > 0.) break;
     }
 
@@ -658,46 +929,11 @@ double* DADSDLogLikelyhoodDtheta(double *thetas, double confirm, double decay, d
         cur_node->state = I; //the node is infected now
         //DADSLog("\n%f ", t);
         //DADSLog(" %f ", loglikelyhood);
-    }
+    } */
 /*    DADSLog("\ntheta: %f", theta);
     DADSLog("\nconfirm: %f", confirm);
     DADSLog("\ndecay: %f", decay);
     DADSLog("\nrelic: %f", relic);
     DADSLog("\nLL: %f", loglikelyhood);*/
-    return dfdthetas;
-}
-
-void DADSCalculateDerivatives(double theta, double confirm, double decay, double relic) {
-    static int first_time = 1;
-    double *thetas;
-
-    if(first_time) {
-        dlldthetas = NULL;
-        n_dlldthetas = 0;
-        first_time = 0;
-    }
-
-    if(dlldthetas) {
-        free(dlldthetas);
-        n_dlldthetas = 0;
-    }
-    if(!und_network.N_cases) return;
-    thetas = malloc(und_network.N_cases * sizeof(double));
-    n_dlldthetas = und_network.N_cases;
-    for(int i=0; i<und_network.N_cases; i++) {
-        thetas[i] = theta;
-    }
-    dlldthetas = DADSDLogLikelyhoodDtheta(thetas, confirm, decay, relic);
-
-    free(thetas);
-}
-
-double DADSDLogLikelyhoodDthetaForId(int32_t id) {
-    if(!n_dlldthetas || n_dlldthetas != und_network.N_cases) return .0;
-    for(int i=0; i<n_dlldthetas; i++) {
-        if(und_network.cases[i].node->id == id) {
-                return dlldthetas[i];
-        }
-    }
-    return .0;
-}
+   /* return dfdthetas;
+}*/

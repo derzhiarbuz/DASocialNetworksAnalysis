@@ -34,6 +34,16 @@ import math
 # nonaz_corr.to_csv('D:/BigData/Galina_Kovarzh/nonaz_corr.csv')
 # naz_corr.to_csv('D:/BigData/Galina_Kovarzh/naz_corr.csv')
 
+def make_test_network_traingle():
+    ntw = Network(optimisation=NetworkOptimisation.id_only)
+    for i in range(3):
+        ntw.add_node(i + 1)
+    ntw.add_link(1, 2)
+    ntw.add_link(1, 3)
+    ntw.add_link(2, 3)
+    return ntw
+
+
 def make_test_network():
     ntw = Network(optimisation=NetworkOptimisation.id_only)
     for i in range(31):

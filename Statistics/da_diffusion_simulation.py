@@ -900,7 +900,7 @@ class Simulator(object):
     def simulate_SI_decay_confirm_relicexp_hetero(cls, underlying: Network, theta: float,
                                                   decay: float, confirm: float, relic: float, thetas: dict = None,
                                                   infected: set = None, immunes: set = None, immune_p=.0,
-                                                  initial_p=.0, tmax=1000.0, dt=1):
+                                                  initial_p=.0, tmax=1000.0, dt=1, echo=False):
         susceptible = set(underlying.nodes_ids)
         outcome_infected = {}
         time = .0
@@ -955,5 +955,73 @@ class Simulator(object):
                     probability *= p_not_infected
             my_infected |= new_infected
             susceptible -= new_infected
-            # print(str(probability) + ' ' + str(infected))
+            if echo:
+                print(str(time) + ' ' + str(probability) + ' ' + str(my_infected))
         return {'outcome': outcome_infected, 'p': probability}
+
+
+    @classmethod
+    def estimate_SI_decay_confirm_relicexp_hetero(cls, underlying: Network, theta: float,
+                                                  decay: float, confirm: float, relic: float, outcome: dict,
+                                                  thetas: dict = None, initials: set = None, immunes: set = set(),
+                                                  immune_p=.0, initial_p=.0, tmax=1000.0, dt=1, echo=False):
+        time = .0
+        my_outcome = outcome.copy()
+        susceptible = set(underlying.nodes_ids)
+        probability = 1.
+        infected = set()
+        infected |= initials
+        susceptible -= immunes | infected
+        i = 0
+        dprob_not = 1.
+        while time < tmax and len(susceptible) > 0:
+            time += dt
+            new_infected = set()
+            dprob_inf = 1.
+            totrel=0
+            for node_id in susceptible:
+                neighbors = underlying.get_in_neighbors_for_node(node_id)
+
+                infected_nbrs = neighbors & infected
+                p_not_infected = 1.
+                relic_total = .0
+                for infected_id in infected:
+                    if outcome.get(infected_id):
+                        relic_total += math.exp(-decay * (time - outcome[infected_id]))
+                    else:
+                        relic_total += math.exp(-decay * time)
+                relic_total *= relic
+                totrel = relic_total
+                if len(infected_nbrs) > 0:
+                    for neighbor_id in infected_nbrs:
+                        time_gone = outcome.get(neighbor_id)
+                        if time_gone:
+                            time_gone = time - time_gone
+                        else:  # initialy infected
+                            time_gone = time
+                        if thetas and thetas.get(neighbor_id):
+                            p_not_infected *= (1. - thetas[neighbor_id] * dt * (math.exp(-time_gone * decay)))
+                        else:
+                            p_not_infected *= (1. - theta * dt * (math.exp(-time_gone * decay)))
+                p_not_infected *= (1. - relic_total * dt)
+                if node_id in my_outcome.keys() and my_outcome[node_id] <= time:
+                    probability *= 1.0 - p_not_infected
+                    dprob_inf *= 1.0 - p_not_infected
+                    new_infected.add(node_id)
+                else:
+                    probability *= p_not_infected
+                    dprob_not *= p_not_infected
+            for node_id in new_infected:
+                my_outcome.pop(node_id)
+            susceptible -= new_infected
+            infected |= new_infected
+            # print(str(probability) + ' ' + str(infected))
+            if echo and len(new_infected):
+                #print(str(list(new_infected)[0]) + ' ' + str(time) + ' ' + str(math.log(probability/(dt**(len(outcome)-1)))))
+                #print(str(list(new_infected)[0]) + ' ' + str(time) + ' ' + str(math.log(dprob_inf / dt)))
+                print(str(list(new_infected)[0]) + ' ' + str(time) + ' ' + str(math.log(dprob_not)) + ' ' + str(math.log(dprob_inf / dt)) + ' ' + str(math.log(probability/(dt**(len(infected-initials))))))
+                print('nr'+str(len(susceptible|new_infected)) + ' ' + str(totrel))
+                dprob_not = 1.
+        #print('tail ' + str(time) + ' ' + str(math.log(dprob_not)) + ' ' + str(math.log(probability/(dt**(len(infected-initials))))))
+        #print(time)
+        return probability
