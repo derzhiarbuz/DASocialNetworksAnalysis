@@ -273,6 +273,8 @@ def get_root_post_for_wall_with_meta(owner_id, post_id):
             post = response['response'][0]
         else:
             print(response)
+            response = {'error':{'error_code':666, 'error_msg':'empty response'}}
+            return response
             exit(666)
         postmeta['postinfo'] = get_postinfo_for_post(post, owner_id)
         postmeta['text'] = re.sub(r"\n", " ", post['text'])

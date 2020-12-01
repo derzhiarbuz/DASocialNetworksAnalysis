@@ -2,6 +2,8 @@
 # Contacts: derzhiarbuz@gmail.com
 
 import ctypes
+import pathlib
+import inspect
 from da_icascades_manager import CascadesManager
 
 
@@ -10,7 +12,8 @@ class DiffusionEstimator(object):
     __instance = None
 
     def __init__(self, echo=False):
-        self.libr = ctypes.cdll.LoadLibrary('D:/Projects/Study/DASocialNetworksAnalysis/C_libs/DADiffusionSimulation.dll')
+        current_path = pathlib.Path(inspect.stack()[0].filename).parent
+        self.libr = ctypes.cdll.LoadLibrary(str(current_path)+'/c_libs/DADiffusionSimulation_old.dll')
         self.libr.DADSLoadNetworkFromFile.argtypes = [ctypes.POINTER(ctypes.c_char), ]
         self.libr.DADSSetMetaForNode.argtypes = [ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ]
         self.libr.DADSSetNumberOfInfections.argtypes = [ctypes.c_int32]
@@ -91,7 +94,7 @@ class DiffusionEstimator(object):
         self.add_outcomes(outcomes)
         self.prepare_for_estimation()
 
-    def loglikelyhood(self, theta, confirm, decay, relic, observe_time=-1):
+    def loglikelyhood(self, theta, confirm, decay, relic, observe_time=-1.):
         return self.libr.DADSLogLikelyhoodTKDR(theta, confirm, decay, relic, observe_time)
 
     def loglikelyhood_ensemble(self, theta, confirm, decay, relic, observe_time=-1):
@@ -119,7 +122,7 @@ if __name__ == '__main__':
     counters = casman.underlying_net.counters_meta
 
     estmtr = DiffusionEstimator(True)
-    estmtr.load_netwotk('D:/BigData/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846u_network.dos',
+    estmtr.load_network('D:/BigData/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846u_network.dos',
                         counters,
                         outcome)
     for i in range(10):

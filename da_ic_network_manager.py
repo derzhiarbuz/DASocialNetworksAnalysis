@@ -56,8 +56,10 @@ class ICNetworkManager(NetworkManager):
             post_id = crawler['post_id']
             meta = crlr.get_root_post_for_wall_with_meta(source_id, post_id)
             if vk.is_error(meta):
-                print('Error: ' + str(meta['error']['error_code']) + ' ' + meta['error']['error_msg'])
-                return 'error'
+                if vk.error_code(meta) != 666: #666 is the code if no root post found
+                    print('Error: ' + str(meta['error']['error_code']) + ' ' + meta['error']['error_msg'])
+                    return 'error'
+                return 'empty'
             self.post_meta = meta
             self.posters[source_id] = self.post_meta['postinfo']
             if self.posters[source_id].get('likes') is not None:
@@ -197,6 +199,33 @@ class ICNetworkManager(NetworkManager):
         for node_id, node_data in self.posters.items():
             outcome[node_id] = (node_data['date'] - min_date)/normalization_factor
         return outcome
+
+    def get_outcome_connected_only(self, possible_links: dict, normalization_factor=1.0):
+        outcome = self.get_outcome(normalization_factor)
+        self.remake_network(possible_links)
+        connected_nodes = set()
+        border = set()
+        for node_id, time in outcome.items():
+            if time <= .0:
+                border.add(node_id)
+        while len(border):
+            new_border = set()
+            for node_id in border:
+                node = self.network.nodes.get(node_id)
+                print(node)
+                if node:
+                    if len(node['out']):
+                        new_border |= set(node['out'])
+            connected_nodes |= border
+            new_border -= connected_nodes
+            border = new_border
+
+        new_outcome = {}
+        for node_id, time in outcome.items():
+            if node_id in connected_nodes:
+                new_outcome[node_id] = time
+
+        return new_outcome
 
 
 

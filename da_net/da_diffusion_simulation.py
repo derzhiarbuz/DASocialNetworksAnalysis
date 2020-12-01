@@ -1025,3 +1025,50 @@ class Simulator(object):
         #print('tail ' + str(time) + ' ' + str(math.log(dprob_not)) + ' ' + str(math.log(probability/(dt**(len(infected-initials))))))
         #print(time)
         return probability
+
+    @classmethod
+    def simulate_ICM(cls, underlying: Network, theta: float, relic: float = .0,
+                     infected: set = None, immunes: set = None,
+                     immune_p=.0, initial_p=.0):
+        susceptible = set(underlying.nodes_ids)
+        outcome_infected = {}
+        time = .0
+        probability = 1.
+        my_infected = infected.copy()
+
+        if my_infected is None:
+            my_infected = set()
+        if immunes is None:
+            immunes = set()
+        if len(my_infected) == 0 and initial_p > 0:
+            for node_id in susceptible:
+                if node_id not in immunes and random.uniform(0, 1.) < initial_p:
+                    my_infected.add(node_id)
+                    outcome_infected[node_id] = time
+        if len(immunes) == 0 and immune_p > 0:
+            for node_id in susceptible:
+                if node_id not in my_infected and random.uniform(0, 1.) < immune_p:
+                    immunes.add(node_id)
+        susceptible -= immunes | my_infected
+
+        fresh_infected = my_infected.copy()
+
+        while len(fresh_infected):
+            new_infected = set()
+            time = time + 1.
+            for node_id in susceptible:
+                neighbors = underlying.get_in_neighbors_for_node(node_id)
+                n_infected = len(neighbors & fresh_infected)
+                if n_infected > 0:
+                    p_not_infected = (1. - theta) ** n_infected * (1. - relic) ** len(fresh_infected)
+                    if random.uniform(0, 1.) < (1. - p_not_infected):
+                        new_infected.add(node_id)
+                        outcome_infected[node_id] = time
+                        probability *= 1. - p_not_infected
+                    else:
+                        probability *= p_not_infected
+            my_infected |= new_infected
+            fresh_infected = new_infected
+            susceptible -= new_infected
+            # print(str(probability) + ' ' + str(infected))
+        return {'outcome': outcome_infected, 'p': probability}

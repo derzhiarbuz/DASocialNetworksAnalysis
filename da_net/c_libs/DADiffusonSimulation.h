@@ -1,5 +1,5 @@
 // Created by Gubanov Alexander (aka Derzhiarbuz) at 06.02.2020
-// Contacts: derzhiarbuz@gmail.com
+// Contacts: derzhiarbuz@yandex.ru
 
 #ifndef _DADIFFUSIONSIMULATION_H_
 #define _DADIFFUSIONSIMULATION_H_
@@ -14,6 +14,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 #include <malloc.h>
+#include <omp.h>
 
 typedef enum {Passive, NS, S, I} NodeState;
 
@@ -31,8 +32,13 @@ struct Nod {
     void* payload;
     NodeState state;
     double theta;
+    ICase** cases;
 };
 
+/*!
+@brief function creates NodePtr object
+@return newly allocated NodePtr with pre-initialized values (zeros and NULLs)
+*/
 NodePtr newNodePtr();
 void clearNodePtr(NodePtr ptr);
 int NodeCompare(const void *, const void *);
@@ -63,6 +69,9 @@ struct Infect {
     ICase *cases;
     int32_t N_cases;
     int32_t id;
+
+    NodePtr *nodes_to_check; //array of nodes that have infected neighbors
+    int32_t N_nodes_to_check;
 };
 
 int ICaseCompare(const void *, const void *);

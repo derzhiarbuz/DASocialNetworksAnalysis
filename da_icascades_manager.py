@@ -22,8 +22,11 @@ class CascadesManager(object):
 
     def get_cascade_by_id(self, cas_id):
         for cascade in self.cascades:
-            if cascade.post_meta['postinfo']['id'] == cas_id:
-                return cascade
+            post_info = cascade.post_meta.get('postinfo')
+            if post_info:
+                if post_info['id'] == cas_id:
+                    return cascade
+        return None
 
     def get_underlying_path(self):
         return self.base_dir + self._name+'u_network.dos'
@@ -41,20 +44,20 @@ class CascadesManager(object):
                 self.crawl_plan.insert(0, src)
                 return -1
         for cascade in self.cascades:
-            sleep(0.1)
+            sleep(0.01)
             res = cascade.crawl_next()
             if res != 0:
                 return res
         if self.underlying_net:
-            sleep(0.1)
+            sleep(0.01)
             return self.underlying_net.crawl_next()
         return 0
 
     def get_posts_for_group(self, group_id, n, post_ids=None):
         if post_ids is None:
-            posts = crlr.get_posts(-abs(group_id), n)
+            posts = crlr.get_posts(group_id, n)
         else:
-            posts = crlr.get_posts_by_id(-abs(group_id), post_ids)
+            posts = crlr.get_posts_by_id(group_id, post_ids)
         if vk.is_error(posts):
             print('Error: ' + str(posts['error']['error_code']) + ' ' + posts['error']['error_msg'])
             return 'error'

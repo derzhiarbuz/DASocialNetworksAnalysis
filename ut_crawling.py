@@ -1,21 +1,6 @@
 # Created by Gubanov Alexander (aka Derzhiarbuz) at 28.04.2019
 # Contacts: derzhiarbuz@gmail.com
 
-import da_connections_network_manager as nwm
-import da_socnetworks_crawler as snc
-import da_sna_data_manager as dm
-from da_ic_network_manager import ICNetworkManager
-from da_connections_network_manager import ConnectionsNetworkManager
-from da_icascades_manager import CascadesManager
-from da_information_conductivity import InformationConductivity
-import math
-from Statistics.da_diffusion_simulation import Simulator
-import numpy as np
-import matplotlib.pyplot as plt
-import Statistics.da_diffusion_estimation as est
-
-import da_socnetworks_crawler as crowler
-
 
 # mngr = ConnectionsNetworkManager(name='test_manager')
 # mngr.load_from_file()
@@ -65,8 +50,9 @@ import da_socnetworks_crawler as crowler
 # casman = CascadesManager(name='Tomsk_v_zaschitu_-192308068_all', base_dir='D:/BigData/Charity/Cascades/')
 # casman.save_to_file()
 # casman.load_from_file()
+
 # casman.schedule_crawl_posts_for_group(-192308068, 1, post_ids={9})
-# casman.schedule_crawl_posts_for_group(-192308068, 500)
+# casman.schedule_crawl_posts_for_group(-192308068, 150)
 # casman.continue_crawling()
 # casman.save_to_file()
 # # casman.load_from_file()
@@ -252,9 +238,3 @@ import da_socnetworks_crawler as crowler
 #         i = 1
 #         t = (time // dt) * dt
 # f.close()
-
-plt.subplot(1, 2, 1)
-plt.bar(x=[-1, 0, 1], height=[0, 0, 5])
-plt.subplot(1, 2, 2)
-plt.bar(x=[-1, 0, 1], height=[100, 0, 105])
-plt.show()

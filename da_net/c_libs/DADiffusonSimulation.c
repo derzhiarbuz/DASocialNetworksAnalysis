@@ -1,5 +1,5 @@
 // Created by Gubanov Alexander (aka Derzhiarbuz) at 06.02.2020
-// Contacts: derzhiarbuz@gmail.com
+// Contacts: derzhiarbuz@yandex.ru
 
 #include "DADiffusonSimulation.h"
 
@@ -15,12 +15,15 @@ NodePtr newNodePtr() {
     ptr->nominal_degree = 0;
     ptr->state = Passive;
     ptr->theta = .0;
+    ptr->cases = NULL;
     return ptr;
 }
 
 
 void clearNodePtr(NodePtr ptr) {
     if(ptr->neigbors) free(ptr->neigbors);
+    if(ptr->payload) free(ptr->payload);
+    if(ptr->cases) free(ptr->cases);
     free(ptr);
 }
 
@@ -325,6 +328,8 @@ void DADSSetNumberOfInfections(int32_t n) {
         for(int32_t i=0; i<und_network.N_infections; i++) {
             if(und_network.infections[i].cases)
                 free(und_network.infections[i].cases);
+            if(und_network.infections[i].nodes_to_check)
+                free(und_network.infections[i].nodes_to_check);
         }
         free(und_network.infections);
     }
@@ -334,6 +339,8 @@ void DADSSetNumberOfInfections(int32_t n) {
         und_network.infections[i].cases = NULL;
         und_network.infections[i].N_cases = 0;
         und_network.infections[i].id = 0;
+        und_network.infections[i].nodes_to_check = NULL;
+        und_network.infections[i].N_nodes_to_check = 0;
     }
 }
 
@@ -450,6 +457,111 @@ void DADSPrepareForEstimation() { //making some stuff to simplify estimation pro
             DADSLog(" %d ", und_network.nodes[i]->neigbors[j]->id);
         }
     }*/
+}
+
+
+//making nodes_to_check array for infection
+void DADSUpdate_infection(int32_t infection_number) {
+    int32_t i, j;
+    NodePtr node;
+    NodeState st;
+    Infect* infection;
+
+    infection = &und_network.infections[infection_number];
+
+    DADSLog("\nPreparing for estimation.");
+    if(!und_network.N) {
+        DADSLog("\nWarning: The network is empty.");
+        return;
+    }
+    if(!infection->N_cases) {
+        DADSLog("\nWarning: There is no infected for infection #%d", infection_number);
+        return;
+    }
+
+    //sorting infection cases by time
+    qsort(infection->cases, infection->N_cases, sizeof(ICase), ICaseCompare);
+    for(i=0; i<infection->N_cases; i++)
+        infection->cases[i].index = i;
+
+
+    if(infection->nodes_to_check) free(infection->nodes_to_check);
+    infection->nodes_to_check = NULL;
+    infection->N_nodes_to_check = 0;
+
+    DADSLog("\nDefining nodes that are in contact with infected.");
+    for(i=0; i<infection->N_cases; i++) {
+        node = infection->cases[i].node;
+        if(node->state != infection_number) infection->N_nodes_to_check++;
+        node->state = infection_number;
+        for(j=0; j<node->actual_degree; j++) {
+            if(node->neigbors[j]->state != infection_number) infection->N_nodes_to_check++;
+            node->neigbors[j]->state = infection_number;
+        }
+    }
+
+    if(!infection->N_nodes_to_check) {
+        DADSLog("\nWarning: No nodes in contact with infected for infection #%d", infection_number);
+        return;
+    }
+
+    infection->nodes_to_check = malloc(infection->N_nodes_to_check * sizeof(NodePtr));
+    j = 0;
+    for(i=0; i<und_network.N; i++) {
+        if(und_network.nodes[i]->state == infection_number) {
+            infection->nodes_to_check[j] = und_network.nodes[i];
+            j++;
+        }
+    }
+    DADSLog("\nPrepared for infection #%d. ", infection_number)
+    DADSLog(" Nodes to check: %d", und_network.N_nodes_to_check);
+}
+
+
+//searching for all nodes should be checeked and making cases arrays for them
+void DADSConnectNodesToCases() {
+    int32_t i, j;
+    NodePtr curNode;
+    Infect* infection;
+
+    #pragma omp parallel for shared(und_network) private(i, j, curNode) schedule(guided)
+    for(i=0; i<und_network.N; i++) {
+        curNode = und_network.nodes[i];
+        if(curNode->cases == -1) {
+            curNode->cases = malloc(und_network.N_infections * sizeof(ICase*));
+            for(j=0; j<und_network.N_infections; j++) {
+                curNode->cases[j] = NULL;
+            }
+        }
+        else {
+            if(curNode->cases) free(curNode->cases);
+                curNode->cases = NULL;
+        }
+    }
+
+    #pragma omp parallel for shared(und_network) private(i, j, infection, curNode) schedule(guided)
+    for(i=0; i<und_network.N_infections; i++) {
+        infection = &und_network.infections[infection_number];
+        for(j=0; j<infection->N_cases; j++) {
+            infection->cases[j].node->cases[i] = &infection->cases[j];
+        }
+    }
+}
+
+
+//making some stuff to simplify estimation process more suitable for parallel calculations
+void DADSPrepareForEstimation_new() {
+    int32_t i;
+
+    for(i=0; i<und_network.N; i++)
+        und_network.nodes[i]->state = -1;
+
+    //this cannot be parralelled
+    for(i=0; i<und_network.N_infections; i++)
+        DADSUpdate_infection(i)
+
+    //now searching for all nodes should be checeked and making cases arrays for them
+    DADSConnectNodesToCases();
 }
 
 
@@ -683,6 +795,131 @@ double DADSLogLikelyhoodKDR(double confirm, double decay, double relic, double o
     DADSLog("\nrelic: %f", relic);
     DADSLog("\nLL: %f", loglikelyhood);*/
     //DADSLog("\n%f", t);
+    return loglikelyhood;
+}
+
+
+double DADSLogLikelyhoodKDR_par(double confirm, double decay, double relic, double observe_time, int32_t infection_number) {
+    int32_t i;
+    double loglikelyhood;
+    double confirm_drop = 0.1;
+    Infect* infection;
+
+    infection = &und_network.infections[infection_number];
+
+    if(observe_time<1) {
+        //if no observation time, set it to the last case time
+        observe_time = infection->cases[und_network.N_cases-1].time;
+    }
+
+    loglikelyhood = .0;
+    for(i=0; i<infection->N_cases; i++) {
+        if(infection->cases[i].time > 0.) break;
+    }
+
+    #pragma omp parallel \
+        shared(und_network, observe_time, confirm, decay, relic, observe_time, infection, confirm_drop) \
+        firstprivate(i) \
+        reduction(+:loglikelyhood)
+    {
+        int32_t j, k, n_i;
+        double t = .0, dt, new_time, inf_rate, cd, relic1, relic2;
+        ICase cur_case, *neigh_case;
+        NodePtr neighbor, cur_node;
+        double value1[infection->N_cases];
+        double value2[infection->N_cases];
+
+        #pragma omp for schedule(guided)
+        for(;i<infection->N_cases + 1; i++) { //the last step is for observation finish time
+
+            //paralleled block
+            if(i < infection->N_cases) //if it's a case, not the end of observation
+                new_time = infection->cases[i].time;
+            else
+                new_time = observe_time;
+            if(i > 0) //if it's a case, not the end of observation
+                t = infection->cases[i-1].time;
+            else
+                t = 0;
+            dt = new_time - t;
+            relic1 = .0;
+            relic2 = .0;
+
+            for(j=0; j<i; j++) {
+                if(decay > .0) {
+                    value1[j] = 1./decay*(exp(decay*(infection->cases[j].time - t)) - exp(decay*(infection->cases[j].time - new_time)));
+                    //value1[j] = 1./(1.-decay)*(pow((new_time - infection->cases[j].time), 1.-decay) - pow((t - infection->cases[j].time), 1. - decay));
+                    relic1 += relic*(value1[j]);
+                    value1[j] *= infection->cases[j].node->theta;
+                    value2[j] = 1.*exp(decay*(infection->cases[j].time - new_time));
+                    //value2[j] = 1.*pow((new_time - infection->cases[j].time), -decay);
+                    relic2 += relic*(value2[j]);
+                    value2[j] *= infection->cases[j].node->theta;
+                }
+                else {
+                    value1[j] = infection->cases[j].node->theta*(new_time - t);
+                    relic1 += relic*(new_time - t);
+                    value2[j] = infection->cases[j].node->theta;
+                    relic2 += relic*1;
+                }
+            }
+            //DADSLog("\n%f ", t);
+            //the member of ll function defined by non-infection during current time interval
+            double prevll = 0;
+            int nrel = 0;
+            for(j=0; j<infection->N_nodes_to_check; j++) {
+                cur_node = infection->nodes_to_check[j];
+                if(cur_node->state == S) { //if node is susceptible
+                    n_i = 0;
+                    inf_rate = .0;
+                    for(k=0; k<cur_node->actual_degree; k++) {
+                        neighbor = cur_node->neigbors[k];
+                        if(neighbor->state == I) { //neighbor is infected
+                            n_i++;
+                            neigh_case = (ICase *)neighbor->payload; //case for this neighbor
+                            inf_rate += neigh_case->value1;
+                        }
+                    }
+                    if(DADSHasConfirmDrop(confirm, (double)n_i/cur_node->nominal_degree))
+                        cd = confirm_drop;
+                    else
+                        cd = 1.;
+                    loglikelyhood -= (inf_rate + relic1);
+                }
+                else if(cur_node->state == NS) {
+                    loglikelyhood -= relic1;
+                }
+            }
+            loglikelyhood -= relic1*(und_network.N - infection->N_nodes_to_check);
+
+            if(i < infection->N_cases) { //if it's a case, not the end of observation
+                cur_case = infection->cases[i];
+                cur_node = cur_case.node;
+                n_i = 0;
+                inf_rate = .0;
+                //the member of ll function defined by infection at the end of current time interval
+                for(k=0; k<cur_node->actual_degree; k++) {
+                    neighbor = cur_node->neigbors[k];
+                    if(neighbor->state == I) { //neighbor is infected
+                        n_i++;
+                        neigh_case = (ICase *)neighbor->payload; //case for this neighbor
+                        inf_rate += neigh_case->value2;
+                    }
+                    else if(neighbor->state == NS) //if neighbor was not susceptible, now it is
+                        neighbor->state = S;
+                }
+                if(DADSHasConfirmDrop(confirm, (double)n_i/cur_node->nominal_degree))
+                    cd = confirm_drop;
+                else
+                    cd = 1.;
+                loglikelyhood += log(inf_rate + relic2);
+                cur_node->state = I;
+            }
+            else {
+            }
+        }
+    }
+    //end of parallel block. Result is reducted to likelyhood
     return loglikelyhood;
 }
 
