@@ -60,6 +60,8 @@ DiffusionModelPtr newDiffusionModelEmpty()
     newDM->has_thetas = 0;
     newDM->has_kappa = 0;
     newDM->prepared = 0;
+    newDM->gradient_alpha_pattern = NULL;
+    newDM->gradient_alpha_length = 0;
     return newDM;
 }
 
@@ -110,6 +112,8 @@ void clearDiffusionModel(DiffusionModelPtr model)
     model->rhos = NULL;
     if(model->kappas) free(model->kappas);
     model->kappas = NULL;
+    if(model->gradient_alpha_pattern) free(model->gradient_alpha_pattern);
+    model->gradient_alpha_pattern = NULL;
     model->prepared = 0;
 }
 
@@ -139,6 +143,8 @@ int dmIsNodeInfected(NodePtr node, int32_t cascade_n, int32_t case_n) {
 
 void dmSetAlphaForNode(NodePtr node, double alpha)
 {
+    if(!node)
+        return;
     DiffusionNodeDataPtr node_data = (DiffusionNodeDataPtr)node->userdata;
     if(!node_data) return;
     node_data->alpha = alpha;
@@ -150,6 +156,16 @@ double dmAlphaForNode(NodePtr node)
     DiffusionNodeDataPtr node_data = (DiffusionNodeDataPtr)node->userdata;
     if(!node_data) return 1.;
     return node_data->alpha;
+}
+
+
+void dmSetAlphaForPattern(DiffusionModelPtr model, int32_t alpha_n, double alpha)
+{
+    if(!model->gradient_alpha_pattern)
+        return;
+    if(model->gradient_alpha_length <= alpha_n)
+        return;
+    dmSetAlphaForNode(model->gradient_alpha_pattern[alpha_n], alpha);
 }
 
 
@@ -544,6 +560,249 @@ double dmLoglikelyhoodICM(DiffusionModelPtr model)
     return loglikelyhood;
 }
 
+//derivatives
+double dmdLogliklelyhooddThetaICM(DiffusionModelPtr model, int32_t cascade_n)
+{
+    double reduction_result = .0;
+    for(int l=0; l<model->N_cascades; l++) //going through all cases
+    {
+
+        if(cascade_n != l) //derivative by p_k is non zero only for k cascade
+            continue;
+        double theta = model->thetas[cascade_n];
+        double rho = model->rhos[cascade_n];
+        CascadePtr cascade = model->cascades[cascade_n];
+        #pragma omp parallel for shared(model, theta, rho, cascade_n, cascade) schedule(static) reduction(+ : reduction_result)
+        for(int32_t i=0; i<cascade->N_nodes_to_check; i++)
+        {
+            double temp;
+            double Y;
+            //double Yexp;
+            int32_t j;
+            NodePtr cur_node = cascade->nodes_to_check[i];
+            NodePtr neighbor;
+
+            int case_number = dmCaseNumberForNode(cur_node, cascade_n);
+            if(case_number>0 && cascade->cases[case_number]->time>.0) //if node was infected and it was not initially infected
+            {
+                Y = 1.;
+                //Yexp = .0;
+                temp = .0;
+                for(j=0; j<cur_node->actual_degree; j++)
+                {
+                    neighbor = cur_node->neigbors[j];
+                    if(dmCaseNumberForNode(neighbor, cascade_n) >= 0) //if neighbor is in infection cases
+                    {
+                        if(cascade->cases[dmCaseNumberForNode(neighbor, cascade_n)]->time < cascade->cases[case_number]->time) //if it was infected earlier
+                        {
+                            Y *= (1. - dmAlphaForNode(neighbor) * theta);
+                            temp += - dmAlphaForNode(neighbor) / (1. - dmAlphaForNode(neighbor) * theta);
+                        }
+                    }
+                }
+                for(j=0; j<case_number; j++)
+                {
+                    if(cascade->cases[j]->time < cascade->cases[case_number]->time)
+                    {
+                        //Yexp += dmAlphaForNode(cascade->cases[j]->node) * rho;
+                        Y *= (1. - dmAlphaForNode(cascade->cases[j]->node) * rho);
+                    }
+                }
+                //Y *= exp(-Yexp);
+                if(temp !=.0)
+                {
+                    reduction_result += Y/(Y - 1.) * temp;
+                }
+            }
+            else if (case_number<0) //node is not initial
+            {
+                temp = .0;
+                for(j=0; j<cur_node->actual_degree; j++)
+                {
+                    neighbor = cur_node->neigbors[j];
+                    if(dmIsNodeInfected(neighbor, cascade_n, cascade->N_cases)) //if neighbor is in infection cases
+                    {
+                        temp += - dmAlphaForNode(neighbor) / (1. - dmAlphaForNode(neighbor) * theta);
+                    }
+                }
+                reduction_result += temp;
+            }
+        }
+    }
+    return reduction_result;
+}
+
+double dmdLogliklelyhooddRhoICM(DiffusionModelPtr model, int32_t cascade_n)
+{
+    double reduction_result = .0;
+    for(int l=0; l<model->N_cascades; l++) //going through all cases
+    {
+        if(cascade_n != l) //derivative by p_k is non zero only for k cascade
+            continue;
+        double theta = model->thetas[cascade_n];
+        double rho = model->rhos[cascade_n];
+        if(rho==0)
+            continue;
+        CascadePtr cascade = model->cascades[cascade_n];
+        #pragma omp parallel for shared(model, theta, rho, cascade) schedule(static) reduction(+ : reduction_result)
+        for(int32_t i=0; i<cascade->N_cases; i++)
+        {
+            double Y;
+            //double Yexp;
+            double temp;
+            int32_t j;
+            NodePtr cur_node = cascade->cases[i]->node;
+            NodePtr neighbor;
+
+            int case_number = i;
+            if(cascade->cases[case_number]->time>.0) //if node was infected and it was not initially infected
+            {
+                Y = 1.;
+                //Yexp = .0;
+                temp = .0;
+                for(j=0; j<cur_node->actual_degree; j++)
+                {
+                    neighbor = cur_node->neigbors[j];
+                    if(dmCaseNumberForNode(neighbor, cascade_n) >= 0) //if neighbor is in infection cases
+                    {
+                        if(cascade->cases[dmCaseNumberForNode(neighbor, cascade_n)]->time < cascade->cases[case_number]->time) //if it was infected earlier
+                        {
+                            Y *= (1. - dmAlphaForNode(neighbor) * theta);
+                        }
+                    }
+                }
+                for(j=0; j<case_number; j++)
+                {
+                    if(cascade->cases[j]->time < cascade->cases[case_number]->time)
+                    {
+                        Y *= (1. - dmAlphaForNode(cascade->cases[j]->node) * rho);
+                        //Yexp += dmAlphaForNode(cascade->cases[j]->node) * rho;
+                        temp += - dmAlphaForNode(cascade->cases[j]->node) / (1. - dmAlphaForNode(cascade->cases[j]->node) * rho);
+                    }
+                }
+                //Y *= exp(-Yexp);
+                if(temp != .0)
+                    reduction_result += Y/(Y - 1.) * temp;
+            }
+        }
+        //for all non infected cases the value is the same
+        double temp;
+        temp = .0;
+        for(int32_t i=0; i<cascade->N_cases; i++)
+        {
+            temp += - dmAlphaForNode(cascade->cases[i]->node) / (1. - dmAlphaForNode(cascade->cases[i]->node) * rho);
+        }
+        reduction_result += temp * (model->network->N - cascade->N_cases);
+    }
+    return reduction_result;
+}
+
+double dmdLogliklelyhooddAlphaICM(DiffusionModelPtr model, NodePtr alpha_node)
+{
+    if(!alpha_node)
+        return .0;
+    double reduction_result = .0;
+    for(int l=0; l<model->N_cascades; l++) //going through all cases
+    {
+        int cascade_n = l;
+        if(alpha_node->id == 190654130) printf("\nNODE 1");
+        //if alpha node was not infected in l cascade thet the derivative is 0
+        if(dmCaseNumberForNode(alpha_node, cascade_n) < 0)
+            continue;
+        if(alpha_node->id == 190654130) printf("\nNODE 2");
+        double theta = model->thetas[cascade_n];
+        double rho = model->rhos[cascade_n];
+        CascadePtr cascade = model->cascades[cascade_n];
+        //#pragma omp parallel for shared(model, theta, rho, cascade_n) schedule(static) reduction(+ : reduction_result)
+        for(int32_t i=0; i<cascade->N_nodes_to_check; i++)
+        {
+            double temp;
+            double Y;
+            int32_t j;
+            NodePtr cur_node = cascade->nodes_to_check[i];
+            NodePtr neighbor;
+
+            int case_number = dmCaseNumberForNode(cur_node, cascade_n);
+            if(case_number>0 && cascade->cases[case_number]->time>.0) //if node was infected and it was not initially infected
+            {
+                Y = 1.;
+                temp = .0;
+                for(j=0; j<cur_node->actual_degree; j++)
+                {
+                    neighbor = cur_node->neigbors[j];
+                    if(dmCaseNumberForNode(neighbor, cascade_n) >= 0) //if neighbor is in infection cases
+                    {
+                        if(cascade->cases[dmCaseNumberForNode(neighbor, cascade_n)]->time < cascade->cases[case_number]->time) //if it was infected earlier
+                        {
+                            Y *= (1. - dmAlphaForNode(neighbor) * theta);
+                            if(alpha_node == neighbor)
+                                temp += - theta / (1. - dmAlphaForNode(neighbor) * theta);
+                        }
+                    }
+                }
+                for(j=0; j<case_number; j++)
+                {
+                    if(cascade->cases[j]->time < cascade->cases[case_number]->time)
+                    {
+                        Y *= (1. - dmAlphaForNode(cascade->cases[j]->node) * theta);
+                        if(alpha_node == cascade->cases[j]->node)
+                            temp += - rho / (1. - dmAlphaForNode(cascade->cases[j]->node) * rho);
+                    }
+                }
+                reduction_result += Y/(Y - 1.) * temp;
+                if(alpha_node->id == 190654130 && temp != 0) printf("\nNUMBER %d TEMP %f YMULT %f", case_number, Y/(Y - 1.) * temp, Y/(Y - 1.));
+            }
+            else if (case_number<0) //was not infected
+            {
+                temp = .0;
+                for(j=0; j<cur_node->actual_degree; j++)
+                {
+                    neighbor = cur_node->neigbors[j];
+                    if(dmIsNodeInfected(neighbor, cascade_n, cascade->N_cases)) //if neighbor is in infection cases
+                    {
+                        if(alpha_node == neighbor)
+                            temp += - theta / (1. - dmAlphaForNode(neighbor) * theta);
+                    }
+                }
+                reduction_result += temp;
+                if(alpha_node->id == 190654130 && temp != 0) {
+                   printf("\nNUMBER2 %d TEMP %f", case_number, temp);
+                }
+            }
+        }
+        //the member that is the same for all non infected nodes
+        reduction_result += (- rho / (1. - dmAlphaForNode(alpha_node) * rho)) * (model->network->N - cascade->N_cases);
+    }
+    return reduction_result;
+}
+
+void dmGradientICM(DiffusionModelPtr model)
+{
+    if(!model) return;
+    if(!model->prepared) dmPrepareForEstimation(model);
+
+    for(int k=0; k<model->gradient_vector_length; k++)
+    {
+        if(k<model->N_cascades) //p
+        {
+            model->gradient_vector[k] = dmdLogliklelyhooddThetaICM(model, k);
+        }
+        else if(k<2*model->N_cascades) //q
+        {
+            model->gradient_vector[k] = dmdLogliklelyhooddRhoICM(model, k-model->N_cascades);
+        }
+        else //alpha
+        {
+            model->gradient_vector[k] = dmdLogliklelyhooddAlphaICM(model, model->gradient_alpha_pattern[k-2*model->N_cascades]);
+        }
+    }
+}
+
+void dmHessianICM(DiffusionModelPtr model)
+{
+
+}
+
 
 //============================================================================
 //LIBRARY FUNCTIONS
@@ -673,6 +932,14 @@ void dmLibSetAlphaForNode(int32_t model_id, int32_t node_id, double alpha)
 }
 
 
+void dmLibSetAlphaForPattern(int32_t model_id, int32_t alpha_n, double alpha)
+{
+    DiffusionModelPtr model = diffusionModels[model_id];
+    if(model && model->network)
+        dmSetAlphaForPattern(model, alpha_n, alpha);
+}
+
+
 double dmLibLoglikelyhood(int32_t model_id)
 {
     DiffusionModelPtr model = diffusionModels[model_id];
@@ -693,4 +960,87 @@ double dmLibLoglikelyhoodICM(int32_t model_id)
     if(model)
         return dmLoglikelyhoodICM(model);
     return .0;
+}
+
+void dmLibSetGradientAlphasPatternLength(int32_t model_id, int32_t n_nodes)
+{
+    DiffusionModelPtr model = diffusionModels[model_id];
+    if(model)
+    {
+        if(model->gradient_alpha_pattern)
+        {
+            free(model->gradient_alpha_pattern);
+            model->gradient_alpha_pattern = NULL;
+            model->gradient_alpha_length = 0;
+        }
+        if(model->gradient_vector)
+        {
+            free(model->gradient_vector);
+            model->gradient_vector = NULL;
+            model->gradient_vector_length = 0;
+        }
+        if(n_nodes>=0)
+        {
+            if(n_nodes>0)
+            {
+                model->gradient_alpha_pattern = malloc(sizeof(NodePtr)*n_nodes);
+                model->gradient_alpha_length = n_nodes;
+            }
+            model->gradient_vector = malloc(sizeof(double)*(2*model->N_cascades + n_nodes));
+            model->gradient_vector_length = 2*model->N_cascades + n_nodes;
+        }
+    }
+}
+
+void dmLibSetGradientAlphasPattern(int32_t model_id, int32_t node_id, int32_t node_n)
+{
+    DiffusionModelPtr model = diffusionModels[model_id];
+    if(model)
+    {
+        NodePtr node = nodeForId(model->network, node_id);
+        model->gradient_alpha_pattern[node_n] = node;
+    }
+}
+
+void dmLibGradientICM(int32_t model_id)
+{
+    DiffusionModelPtr model = diffusionModels[model_id];
+    if(model)
+    {
+        dmGradientICM(model);
+    }
+}
+
+double dmLibGetGradient(int32_t model_id, int32_t var_number)
+{
+    DiffusionModelPtr model = diffusionModels[model_id];
+    if(model)
+    {
+        return model->gradient_vector[var_number];
+    }
+    return .0;
+}
+
+int32_t dmLibGetGradientLength(int32_t model_id)
+{
+    DiffusionModelPtr model = diffusionModels[model_id];
+    if(model)
+    {
+        return model->gradient_vector_length;
+    }
+    return 0;
+}
+
+void dmLibSetGradientValue(int32_t model_id, int32_t value_n, double value)
+{
+    DiffusionModelPtr model = diffusionModels[model_id];
+    if(model)
+    {
+        if(value_n < model->N_cascades)
+            dmLibSetThetaForCascade(model_id, value_n, value);
+        else if(value_n < 2*model->N_cascades)
+            dmLibSetRhoForCascade(model_id, value_n-model->N_cascades, value);
+        else
+            dmSetAlphaForNode(model->gradient_alpha_pattern[value_n-2*model->N_cascades], value);
+    }
 }

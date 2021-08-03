@@ -61,18 +61,15 @@ def set_diffusion_data_ensemble_newlib(netwf: str, outcomes, observe_times=None,
     dest = new_lib.DiffusionModel.default(echo=echo)
     # dest.testParallel()
     model_id = dest.new_model(netwf, len(outcomes))
-    print("3 + ", str(model_id))
     for i in range(len(outcomes)):
         outcome = outcomes[i]
         dest.set_ncases_for_cascade(model_id, i, len(outcome))
-        print("4"+str(i))
         for node_id, time in outcome.items():
             dest.add_case(model_id, i, node_id, time)
         if observe_times:
             dest.set_observation_time_for_cascade(model_id, i, observe_times[i])
         else:
             dest.set_observation_time_for_cascade(model_id, i, -1.)
-        print("5" + str(i))
 
 
 def llfunc_for_diffusion(thetas, confirms, decays, relics):
@@ -258,15 +255,37 @@ def loglikelyhood_ICM_newlib(x):
         return .0
 
     rho = .0
-    if x[0] < 1e-12:
+    if x[0] < 1e-30:
         return 1e20
     if len(x)==2:
         rho = x[1]
-        if rho < 1e-12:
+        if rho < 1e-30:
             return 1e20
     ll = new_lib.DiffusionModel.default().loglikelyhoodICM(model_id, x[0], rho)
     print(str(-ll) + '   ' + str(x))
     return -ll
+
+
+def loglikelyhood_ICM_newlib_pattern(x):
+    global model_id
+    if model_id < 0:
+        return .0
+
+    ll = new_lib.DiffusionModel.default().loglikelyhoodICM_pattern(model_id, x=x)
+    print(str(-ll) + '   ' + str(x))
+    return -ll
+
+
+def gradient_ICM_newlib_pattern(x):
+    global model_id
+    if model_id < 0:
+        return .0
+
+    grad = new_lib.DiffusionModel.default().gradientICM_pattern(model_id, x=x)
+    for i in range(len(grad)):
+        grad[i] = -grad[i]
+    print('Grad  ' + str(grad) + '\nPoint ' + str(x))
+    return np.array(grad)
 
 
 def loglikelyhood_by_node_theta(x, node_id, theta, decay, relic, observe_time):
@@ -367,4 +386,34 @@ def llmax_for_diffusion_noconfirm_by_node_theta(node_id, theta, decay, relic, bo
     dest = DiffusionEstimator.default(echo=True)
     res = minimize_scalar(loglikelyhood_by_node_theta, bounds=bounds, method='bounded',
                           args=(node_id, theta, decay, relic, observe_time))
+    return res.x
+
+def set_alphas_pattern(nodes):
+    global model_id
+    if model_id < 0:
+        return {}
+    new_lib.DiffusionModel.default().setAlphasPattern(model_id, nodes)
+
+
+def gradient_ICM(thetas, rhos, alphas, nodes):
+    global model_id
+    if model_id < 0:
+        return {}
+
+    new_lib.DiffusionModel.default().setAlphasPattern(model_id, nodes)
+    result = new_lib.DiffusionModel.default().gradientICM(model_id, thetas=thetas, rhos=rhos, alphas=alphas)
+    return result
+
+def llmax_gradient_ICM(x0, nodes=None):
+    global model_id
+    if model_id < 0:
+        return {}
+    if nodes:
+        new_lib.DiffusionModel.default().setAlphasPattern(model_id, nodes)
+    else:
+        new_lib.DiffusionModel.default().setAlphasPattern(model_id, [])
+    x0arr = np.array(x0)
+    bounds = [(1e-15, None) for i in range(len(x0))]
+    res = minimize(fun=loglikelyhood_ICM_newlib_pattern, x0=x0arr, jac=gradient_ICM_newlib_pattern,
+                   method='CG', tol=None, options={'gtol': 1e-30, 'disp': True, 'eps': 1e-30})
     return res.x

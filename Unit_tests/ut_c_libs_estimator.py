@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import math
 import Unit_tests.ut_statanalysis as ut_stat
 import scipy.stats as sp_stat
+import json
 
 
 def test_network_manager(ntype=None):
@@ -180,13 +181,18 @@ def test_zashitim_taigu_confirm_multiple(post_ids=None):
         cascades = casman.cascades
     else:
         for post_id in post_ids:
+            cascade = casman.get_cascade_by_id(post_id)
             cascades.append(casman.get_cascade_by_id(post_id))
+            outcome = cascade.get_outcome(normalization_factor=3600)
+            print(outcome)
+            with open('D:/BigData/Charity/Cascades/cascade_-164443025_' + str(post_id) + '.json', "w") as write_file:
+                json.dump(outcome, write_file, indent=4)
     for cascade in cascades:
         outcome = cascade.get_outcome(normalization_factor=3600)
         print(len(outcome))
         outcomes.append(outcome)
         tmaxs.append(1.5 * max(outcome.values()))
-    return
+
     print(casman.get_underlying_path())
     est.set_diffusion_data_ensemble_newlib(casman.get_underlying_path(), outcomes=outcomes, observe_times=tmaxs)
     thetas0 = [2.0334495598850714e-05 for i in range(len(outcomes))]

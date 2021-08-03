@@ -94,6 +94,12 @@ struct DiffusionModel {
     double delta;  ///<\~russian Параметр модели delta \~english The delta model parameter
     double *kappas; ///<\~russian Массив параметров kappa для каскадов \~english Array of model parameters kappas for cascades
 
+    NodePtr *gradient_alpha_pattern;
+    int gradient_alpha_length;
+    double *gradient_vector;
+    int gradient_vector_length;
+    double *hessian_matrix;
+
     int has_thetas;
     int has_rhos;
     int has_alphas;
@@ -156,6 +162,7 @@ int dmIsNodeInfected(NodePtr node, int32_t cascade_n, int32_t case_n);
 
 void dmSetAlphaForNode(NodePtr node, double alpha);
 double dmAlphaForNode(NodePtr node);
+void dmSetAlphaForPattern(DiffusionModelPtr model, int32_t alpha_n, double alpha);
 void dmSetNCasesForCascade(DiffusionModelPtr model, int32_t cascade_n, int32_t n_cases);
 void dmSetObservationTimeForCascade(DiffusionModelPtr model, int32_t cascade_n, double observation_time);
 void dmAddCase(DiffusionModelPtr model, int32_t cascade_n, int32_t node_id, double case_time);
@@ -165,6 +172,12 @@ double dmLoglikelyhoodForCase(DiffusionModelPtr model, int32_t cascade_n, int32_
 double dmLoglikelyhoodCasewise(DiffusionModelPtr model);
 double dmLoglikelyhoodNodewise(DiffusionModelPtr model);
 double dmLoglikelyhoodICM(DiffusionModelPtr model);
+
+double dmdLogliklelyhooddThetaICM(DiffusionModelPtr model, int32_t cascade_n);
+double dmdLogliklelyhooddRhoICM(DiffusionModelPtr model, int32_t cascade_n);
+double dmdLogliklelyhooddAlphaICM(DiffusionModelPtr model, NodePtr alpha_node);
+void dmGradientICM(DiffusionModelPtr model);
+void dmHessianICM(DiffusionModelPtr model);
 
 /*! @} */
 
@@ -187,8 +200,15 @@ void dmLibSetThetaForCascade(int32_t model_id, int32_t cascade_n, double theta);
 void dmLibSetRhoForCascade(int32_t model_id, int32_t cascade_n, double rho);
 void dmLibSetKappaForCascade(int32_t model_id, int32_t cascade_n, double kappa);
 void dmLibSetAlphaForNode(int32_t model_id, int32_t node_id, double alpha);
+void dmLibSetAlphaForPattern(int32_t model_id, int32_t alpha_n, double alpha);
 double dmLibLoglikelyhood(int32_t model_id);
 double dmLibLoglikelyhoodICM(int32_t model_id);
+void dmLibSetGradientAlphasPatternLength(int32_t model_id, int32_t n_nodes);
+void dmLibSetGradientAlphasPattern(int32_t model_id, int32_t node_id, int32_t node_n);
+void dmLibGradientICM(int32_t model_id);
+double dmLibGetGradient(int32_t model_id, int32_t var_number);
+int32_t dmLibGetGradientLength(int32_t model_id);
+void dmLibSetGradientValue(int32_t model_id, int32_t value_n, double value);
 /*! @} */
 
 #ifdef  __cplusplus
