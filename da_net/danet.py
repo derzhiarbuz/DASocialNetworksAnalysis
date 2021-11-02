@@ -1,6 +1,7 @@
 # Created by Gubanov Alexander (aka Derzhiarbuz) at 06.11.2020
 # Contacts: derzhiarbuz@gmail.com
 
+from sys import platform
 import ctypes
 import pathlib
 import inspect
@@ -15,6 +16,10 @@ class DiffusionModel(object):
         path = str(current_path) + '\\c_libs\\DADiffusionSimulation.dll'
         path = 'D:/Projects/Study/DASocialNetworksAnalysis/da_net/c_libs/danet.dll'
         print(path)
+        if platform == 'win32' or platform == 'win64':
+            self.libr = ctypes.cdll.LoadLibrary(path)
+        elif platform == 'linux' or platform == 'linux2':
+            self.libr = ctypes.CDLL(str(current_path) + '/c_libs/libdanet.so')
         self.libr = ctypes.cdll.LoadLibrary(path)
 
         self.libr.dmLibNewDiffusionModel.argtypes = [ctypes.POINTER(ctypes.c_char), ctypes.c_int32, ]

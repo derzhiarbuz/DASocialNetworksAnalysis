@@ -1,6 +1,7 @@
 # Created by Gubanov Alexander (aka Derzhiarbuz) at 06.02.2020
 # Contacts: derzhiarbuz@gmail.com
 
+from sys import platform
 import ctypes
 import pathlib
 import inspect
@@ -13,7 +14,10 @@ class DiffusionEstimator(object):
 
     def __init__(self, echo=False):
         current_path = pathlib.Path(inspect.stack()[0].filename).parent
-        self.libr = ctypes.cdll.LoadLibrary(str(current_path)+'/c_libs/DADiffusionSimulation_old.dll')
+        if platform == 'win32' or platform == 'win64':
+            self.libr = ctypes.cdll.LoadLibrary(str(current_path)+'/c_libs/DADiffusionSimulation.dll')
+        elif platform == 'linux' or platform == 'linux2':
+            self.libr = ctypes.cdll.LoadLibrary(str(current_path) + '/c_libs/DADiffusionSimulation.dll')
         self.libr.DADSLoadNetworkFromFile.argtypes = [ctypes.POINTER(ctypes.c_char), ]
         self.libr.DADSSetMetaForNode.argtypes = [ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ]
         self.libr.DADSSetNumberOfInfections.argtypes = [ctypes.c_int32]

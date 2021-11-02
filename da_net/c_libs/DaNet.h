@@ -168,6 +168,17 @@ MMMM штук). Таким образом, файл представляет и�
 */
 void loadNetworkFromFile(NetworkPtr network, const char * fpath);
 /*!
+\~russian @brief преобразование списка рёбер в бинарный файл с сетью
+@details список рёбер ...
+
+\param network указатель NetworkPtr на сеть, в которую нужно загрузить данные
+\param fname путь к файлу
+
+\~english @brief -
+@details -
+*/
+void edgeListToBinary(const char * list_path, const char * network_path);
+/*!
 \~russian @brief функция, возвращающая узел сети по его идентификатору
 @param network указатель NetworkPtr на сеть
 @param id идентификатор узла
