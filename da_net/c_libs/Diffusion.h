@@ -18,8 +18,12 @@ extern "C" {
 #endif
 
 #include <malloc.h>
+#include <gsl/gsl_multimin.h>
+#include <ool/ool_conmin.h>
+#include <ool/ool_tools_diff.h>
 #include "DaNet.h"
 
+typedef struct IntegerPair_ IntegerPair;
 typedef struct DiffusionNodeData DiffusionNodeData;
 typedef struct DiffusionModel DiffusionModel;
 /*! \~russian \addtogroup DiffusionGroup Модель диффузии
@@ -29,6 +33,13 @@ typedef struct DiffusionModel DiffusionModel;
 */
 typedef DiffusionNodeData* DiffusionNodeDataPtr;
 typedef DiffusionModel* DiffusionModelPtr;
+
+struct IntegerPair_ {
+    int32_t a;
+    int32_t b;
+};
+
+int inegerPairCompareA(const void *n1, const void *n2);
 
 /*!
 \~russian @brief Параметры узла в модели диффузии
@@ -51,7 +62,8 @@ struct DiffusionNodeData {
     \~english @brief -
     @details -
     */
-    int32_t *case_numbers;
+    IntegerPair *case_numbers;
+    int32_t n_case_numbers;
     double alpha; ///<\~russian Модификатор интенсивности заражения \~english Infection rate modifier
 };
 void createNumbersInDiffusionNodeData(DiffusionNodeDataPtr dnd, int32_t n_cases);
@@ -74,6 +86,10 @@ DiffusionNodeDataPtr newDiffusionNodeData(int32_t n_cases);
 @details -
 */
 void freeDiffusionNodeData(DiffusionNodeDataPtr dnd);
+
+int32_t diffusionNodeDataGetCaseNumber(DiffusionNodeDataPtr userdata, int32_t cascade_n);
+
+void diffusionNodeDataSetCaseNumber(DiffusionNodeDataPtr userdata, int32_t case_n, int32_t cascade_n);
 
 /*!
 \~russian @brief Модель диффузии
@@ -100,11 +116,11 @@ struct DiffusionModel {
     int gradient_vector_length;
     double *hessian_matrix;
 
-    int has_thetas;
-    int has_rhos;
-    int has_alphas;
-    int has_delta;
-    int has_kappa;
+    int32_t has_thetas;
+    int32_t has_rhos;
+    int32_t has_alphas;
+    int32_t has_delta;
+    int32_t has_kappa;
 
     int prepared;
 };
@@ -116,7 +132,25 @@ struct DiffusionModel {
 @details -
 */
 DiffusionModelPtr newDiffusionModelEmpty();
+/*!
+\~russian @brief функция, создающая модель на заданной сети
+@details функция создаёт новый объект DiffusionModelPtr. В качестве сети-подложки загружается сеть из файла network_file_path.
+Так же инициализируется массив каскадов размера n_cascades.
+@return вновь созданный объект DiffusionModelPtr
+\~english @brief -
+@details -
+*/
 DiffusionModelPtr newDiffusionModel(const char* network_file_path, int16_t n_cascades);
+/*!
+\~russian @brief функция, создающая модель на заданной сети с заданными каскадами
+@details функция создаёт новый объект DiffusionModelPtr. В качестве сети-подложки загружается сеть из файла network_file_path.
+Так же из файла cascades_file_path загружаются каскады. Так как время в файле каскадов указывается в секундах, то задаётся фактор
+нормализации, задающий единичный временной интервал в модели (например, 3600 для единичного интервала в 1 час)
+@return вновь созданный объект DiffusionModelPtr
+\~english @brief -
+@details -
+*/
+DiffusionModelPtr newDiffusionModelWithCascades(const char* network_file_path, const char* cascades_file_path, float normalisation_factor);
 /*!
 \~russian @brief функция, сбрасывающая модель
 @details в функции освобождается динамическая память, выделенная моделью, а так же обнуляются значения всех полей
@@ -162,10 +196,16 @@ int dmIsNodeInfected(NodePtr node, int32_t cascade_n, int32_t case_n);
 
 void dmSetAlphaForNode(NodePtr node, double alpha);
 double dmAlphaForNode(NodePtr node);
+void dmSetGradientAlphasPatternLength(DiffusionModelPtr model, int32_t n_nodes);
+void dmSetAlphasPatternOutliers(DiffusionModelPtr model);
 void dmSetAlphaForPattern(DiffusionModelPtr model, int32_t alpha_n, double alpha);
+double dmAlphaForPattern(DiffusionModelPtr model, int32_t alpha_n);
+void dmSetGradientAlphasPattern(DiffusionModelPtr model, int32_t node_id, int32_t node_n);
 void dmSetNCasesForCascade(DiffusionModelPtr model, int32_t cascade_n, int32_t n_cases);
 void dmSetObservationTimeForCascade(DiffusionModelPtr model, int32_t cascade_n, double observation_time);
 void dmAddCase(DiffusionModelPtr model, int32_t cascade_n, int32_t node_id, double case_time);
+void dmSetThetas(DiffusionModelPtr model, double theta);
+void dmSetRhos(DiffusionModelPtr model, double rho);
 void dmPrepareForEstimation(DiffusionModelPtr model);
 
 double dmLoglikelyhoodForCase(DiffusionModelPtr model, int32_t cascade_n, int32_t case_n);
@@ -178,6 +218,10 @@ double dmdLogliklelyhooddRhoICM(DiffusionModelPtr model, int32_t cascade_n);
 double dmdLogliklelyhooddAlphaICM(DiffusionModelPtr model, NodePtr alpha_node);
 void dmGradientICM(DiffusionModelPtr model);
 void dmHessianICM(DiffusionModelPtr model);
+
+void dmLoadModelState(DiffusionModelPtr model, const char * state_path);
+void dmSaveModelState(DiffusionModelPtr model, const char * state_path);
+void dmMaximizeICM(DiffusionModelPtr model, int32_t max_steps);
 
 /*! @} */
 

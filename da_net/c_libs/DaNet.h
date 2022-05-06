@@ -26,11 +26,11 @@ extern "C" {
 #include <malloc.h>
 //#include <omp.h>
 
-typedef struct Node Node;
-typedef struct Network Network;
-typedef struct ICase ICase;
-typedef struct Cascade Cascade;
-typedef struct Derivatives Derivatives;
+typedef struct Node_ Node;
+typedef struct Network_ Network;
+typedef struct ICase_ ICase;
+typedef struct Cascade_ Cascade;
+typedef struct Derivatives_ Derivatives;
 
 /*! \~russian \addtogroup CascadeGroup Каскад
     @{
@@ -56,7 +56,7 @@ typedef Network* NetworkPtr;
 \~english @brief -
 @details -
 */
-struct Node {
+struct Node_ {
     int32_t id; ///<\~russian Идентификатор узла \~english Node identifier
     NodePtr *neigbors; ///<\~russian Массив указателей на соседей \~english Array of neighbors
     int32_t actual_degree; ///<\~russian Длина массива 'neighbors' \~english Length of 'neighbors' array
@@ -113,7 +113,7 @@ int nodeCompare(const void *n1, const void *n2);
 \~english @brief -
 @details -
 */
-struct Network {
+struct Network_ {
     NodePtr *nodes; ///<\~russian Массив узлов \~english Array of nodes
     int32_t N; ///<\~russian Количество узлов \~english Number of nodes
 };
@@ -203,7 +203,7 @@ NodePtr nodeForId(NetworkPtr network, int32_t id);
 \~english @brief -
 @details -
 */
-struct ICase {
+struct ICase_ {
     NodePtr node; ///<\~russian Указатель на заразившийся узел \~english Pointer to node infected
     double time; ///<\~russian Момент заражения \~english The moment of infection
     int32_t index; ///<\~russian Индекс случая заражения в своём каскаде \~english Index of the infection case in it's cascade
@@ -232,7 +232,7 @@ int ICaseCompare(const void *c1, const void *c2);
 \~english @brief -
 @details -
 */
-struct Cascade {
+struct Cascade_ {
     ICasePtr *cases;  ///<\~russian Массив случаев заражения \~english Array of the moments of infection
     int32_t N_cases;  ///<\~russian Количество случаев заражения \~english Number of the moments of infection
     int32_t cases_length;
@@ -242,7 +242,8 @@ struct Cascade {
     */
     double observation_time;
     int32_t id;  ///<\~russian Идентификатор каскада \~english Cascade id
-    NetworkPtr network;  ///<\~russian Сеть, на которой имеет место каскаж \~english Cascade's network
+    int32_t from_id;  ///<\~russian Идентификатор источника каскада \~english Cascade source id
+    NetworkPtr network;  ///<\~russian Сеть, на которой имеет место каскад \~english Cascade's network
 
 
     NodePtr *nodes_to_check; ///<\~russian Массив узлов, имеющих отношения к каскаду \~english Array of nodes considered as related to cascade

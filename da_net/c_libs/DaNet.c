@@ -1,9 +1,15 @@
 // Created by Gubanov Alexander (aka Derzhiarbuz) at 29.10.2020
 // Contacts: derzhiarbuz@yandex.ru
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 #include "DaNet.h"
 
 #include <math.h>
+
+//#define OLSCHOOL_LOADING
 
 NodePtr newNode()
 {
@@ -96,6 +102,7 @@ void loadNetworkFromFile(NetworkPtr network, const char * fpath)
 {
     FILE * f;
     int64_t size_in_bytes = 0;
+    int32_t a=0;
 
     clearNetwork(network);
 
@@ -121,17 +128,24 @@ void loadNetworkFromFile(NetworkPtr network, const char * fpath)
 
     NodePtr newNod;
     for(int32_t i=0; i<network->N; i++)
+    //for(int32_t i=0; i<10; i++)
     {
         newNod = newNode();
+        size_in_bytes += sizeof(Node);
+#ifndef OLSCHOOL_LOADING
         fread((void *)(&newNod->nominal_degree), 4, 1, f);
         fread((void *)(&newNod->actual_degree), 4, 1, f);
-        //newNod->nominal_degree = newNod->actual_degree;
+#else
+        fread((void *)(&newNod->actual_degree), 4, 1, f);
+        newNod->nominal_degree = newNod->actual_degree;
+#endif
         fread((void *)(&newNod->id), 4, 1, f);
         newNod->userdata = malloc(newNod->actual_degree * 4);
+        size_in_bytes += newNod->actual_degree * 4;
         fread(newNod->userdata, 4, newNod->actual_degree, f);
         network->nodes[i] = newNod;
+        //printf("\ni: %d, deg: %d, size: %ld", i, newNod->actual_degree, size_in_bytes);
     }
-
     fclose(f);
 
     DADSLog("\nNetwork readed. Optimizing...");
@@ -140,6 +154,7 @@ void loadNetworkFromFile(NetworkPtr network, const char * fpath)
     qsort(network->nodes, network->N, sizeof(NodePtr), nodeCompare);
 
     int64_t new_size = 0;
+    //int32_t j=0;
     #pragma omp parallel for shared(network) schedule(guided) reduction(+ : new_size)// num_threads(4)
     for(int32_t i=0; i<network->N; i++)
     {
@@ -150,9 +165,12 @@ void loadNetworkFromFile(NetworkPtr network, const char * fpath)
         curNode = network->nodes[i];
         curNode->neigbors = malloc(curNode->actual_degree * sizeof(NodePtr));
         neig_ids = (int32_t *)curNode->userdata;
+        Node n;
+        NodePtr tempNode = &n;
         for(int32_t j=0; j<curNode->actual_degree; j++)
         {
-            neigNode = nodeForId(network, neig_ids[j]);
+            n.id = neig_ids[j];
+            neigNode = *(NodePtr*)bsearch(&tempNode, network->nodes, network->N, sizeof(NodePtr), nodeCompare);
             if(!neigNode)
             {
                 DADSLog("\nWarning: Unable to find a node %d", neig_ids[j]);
@@ -163,11 +181,15 @@ void loadNetworkFromFile(NetworkPtr network, const char * fpath)
         }
         free(curNode->userdata);
         curNode->userdata = NULL;
-        new_size += curNode->actual_degree * sizeof(NodePtr) + sizeof(Node);
+        new_size += curNode->actual_degree * (sizeof(NodePtr) - sizeof(int32_t));
+        /*if(i%10000 == 0)
+        {
+            printf("\ni: %i, size: %ld", i, size_in_bytes+new_size);
+        }*/
     }
     size_in_bytes += new_size;
 
-    DADSLog("\nNetwork optimized. Size in bytes: %d", size_in_bytes);
+    DADSLog("\nNetwork optimized. Size in bytes: %ld", size_in_bytes);
 }
 
 typedef struct _pair {int32_t a; int32_t b;} Pair;
@@ -423,7 +445,7 @@ void edgeListToBinary(const char * list_path, const char * network_path)
     //symmetrizing first adj
     for(k=0; k<a_to.N; k++)
     {
-        node_found = bsearch(&a_to.nodes[k], a_from.nodes, a_from.N, sizeof(int32_t), int32Compare);
+        node_found = (int32_t *)bsearch(&a_to.nodes[k], a_from.nodes, a_from.N, sizeof(int32_t), int32Compare);
         //add edges to nodes
         if(node_found)
         {
@@ -540,7 +562,7 @@ NodePtr nodeForId(NetworkPtr network, int32_t id)
     NodePtr *retNode;
     if(!tempNode) tempNode = newNode();
     tempNode -> id = id;
-    retNode = bsearch(&tempNode, network->nodes, network->N, sizeof(NodePtr), nodeCompare);
+    retNode = (NodePtr *)bsearch(&tempNode, network->nodes, network->N, sizeof(NodePtr), nodeCompare);
     if(!retNode) return NULL;
     return *retNode;
 }
@@ -636,3 +658,7 @@ void DADSLog(char *text, ...)
     if(echo == 33) vprintf(text, args);
     va_end(args);
 }
+
+#ifdef  __cplusplus
+}
+#endif

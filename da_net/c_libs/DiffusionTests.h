@@ -17,6 +17,7 @@ extern double cascade_3[29][2];
 extern DiffusionModelPtr diffusionModel;
 
 void testLikelyhood();
+void testMinimizer();
 
 #ifdef  __cplusplus
 }

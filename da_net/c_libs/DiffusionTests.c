@@ -64,7 +64,7 @@ void testLikelyhood()
 
     for(int i=0; i<3; i++)
     {
-        model->thetas[i] = 0.02;
+        model->thetas[i] = 0.001;
         model->rhos[i] = 0.001;
     }
     model->delta = 0.02;
@@ -75,4 +75,35 @@ void testLikelyhood()
     ll = dmLoglikelyhoodCasewise(model);
     t_end = omp_get_wtime();
     printf ("\nLoglikelyhood: %f \n Time parallel %f", ll, t_end - t_start);
+}
+
+void testMinimizer()
+{
+    //DiffusionModelPtr model = newDiffusionModelWithCascades("/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846u_network.dos",
+    //                                                        "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_outcomes_bin.cb", 3600);
+    DiffusionModelPtr model = newDiffusionModelWithCascades("/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846u_network.dos",
+                                                            "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_8726_seq_bin.cb", 3600);
+    //DiffusionModelPtr model = newDiffusionModelWithCascades("/home/derzhiarbuz/Bigdata/Charity/Cascades/RussianBirchu_network.dos",
+    //                                                        "/home/derzhiarbuz/Bigdata/Charity/Cascades/RussianBirch_outcomes_bin.cb", 3600);
+    //DiffusionModelPtr model = newDiffusionModelWithCascades("/home/derzhiarbuz/Bigdata/Charity/Cascades/WorldVitau_network.dos",
+    //                                                        "/home/derzhiarbuz/Bigdata/Charity/Cascades/WorldVita_outcomes_bin.cb", 3600);
+    //dmPrepareForEstimation(model);
+    //dmSetGradientAlphasPatternLength(model, 0);
+    //dmSetThetas(model, 1e-8);
+    //dmSetRhos(model, 1e-8);
+    //model->has_thetas = 1;
+    //model->has_rhos = 1;
+    //model->has_alphas = 0;
+    //dmSaveModelState(model, "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_state1seq.csv");
+    dmLoadModelState(model, "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_state1seq.csv");
+    dmMaximizeICM(model, 3000);
+    dmSaveModelState(model, "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_state1seq.csv");
+    //dmSetAlphasPatternOutliers(model);
+    //dmSaveModelState(model, "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_state2seq.csv");
+    //dmLoadModelState(model, "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_state3seq.csv");
+    //model->has_thetas = 0;
+    //model->has_rhos = 0;
+    //model->has_alphas = 1;
+    //dmMaximizeICM(model, 600);
+    //dmSaveModelState(model, "/home/derzhiarbuz/Bigdata/Charity/Cascades/Zashitim_taigu_-164443025_8726_8021_6846_state3seq.csv");
 }
